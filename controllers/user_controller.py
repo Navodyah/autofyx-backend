@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 from config.mongodb import get_database
 from models.user_models import User, UserLogin
-from passlib.context import CryptContext
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_hasher = PasswordHasher()
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return pwd_hasher.hash(password)
 
 
 def create_user_mongo(user: User):
@@ -38,7 +39,9 @@ def login_user_mongo(credentials: UserLogin):
     if not user_doc:
         return {"msg": "User not found"}
 
-    if not pwd_context.verify(credentials.password, user_doc["hashed_password"]):
+    try:
+        pwd_hasher.verify(user_doc["hashed_password"], credentials.password)
+    except VerifyMismatchError:
         return {"msg": "Incorrect password"}
 
     return {

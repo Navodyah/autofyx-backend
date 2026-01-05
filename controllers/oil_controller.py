@@ -1,33 +1,37 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models.oil import OilQuality
 from typing import Optional
 
 
-def create_oil_quality(db: Session, oil_grade: str, description: Optional[str] = None):
+async def create_oil_quality(db: AsyncSession, oil_grade: str, description: Optional[str] = None):
     """Create a new oil quality"""
     new_oil_quality = OilQuality(
         oil_grade=oil_grade,
         description=description
     )
     db.add(new_oil_quality)
-    db.commit()
-    db.refresh(new_oil_quality)
+    await db.commit()
+    await db.refresh(new_oil_quality)
     return new_oil_quality
 
 
-def get_oil_quality_by_id(db: Session, oil_id: int):
+async def get_oil_quality_by_id(db: AsyncSession, oil_id: int):
     """Get an oil quality by ID"""
-    return db.query(OilQuality).filter(OilQuality.oil_id == oil_id).first()
+    result = await db.execute(select(OilQuality).filter(OilQuality.oil_id == oil_id))
+    return result.scalar_one_or_none()
 
 
-def get_all_oil_qualities(db: Session, skip: int = 0, limit: int = 100):
+async def get_all_oil_qualities(db: AsyncSession, skip: int = 0, limit: int = 100):
     """Get all oil qualities with pagination"""
-    return db.query(OilQuality).offset(skip).limit(limit).all()
+    result = await db.execute(select(OilQuality).offset(skip).limit(limit))
+    return result.scalars().all()
 
 
-def update_oil_quality(db: Session, oil_id: int, oil_grade: Optional[str] = None, description: Optional[str] = None):
+async def update_oil_quality(db: AsyncSession, oil_id: int, oil_grade: Optional[str] = None, description: Optional[str] = None):
     """Update an oil quality"""
-    oil_quality = db.query(OilQuality).filter(OilQuality.oil_id == oil_id).first()
+    result = await db.execute(select(OilQuality).filter(OilQuality.oil_id == oil_id))
+    oil_quality = result.scalar_one_or_none()
     if not oil_quality:
         return None
 
@@ -36,17 +40,18 @@ def update_oil_quality(db: Session, oil_id: int, oil_grade: Optional[str] = None
     if description is not None:
         oil_quality.description = description
 
-    db.commit()
-    db.refresh(oil_quality)
+    await db.commit()
+    await db.refresh(oil_quality)
     return oil_quality
 
 
-def delete_oil_quality(db: Session, oil_id: int):
+async def delete_oil_quality(db: AsyncSession, oil_id: int):
     """Delete an oil quality"""
-    oil_quality = db.query(OilQuality).filter(OilQuality.oil_id == oil_id).first()
+    result = await db.execute(select(OilQuality).filter(OilQuality.oil_id == oil_id))
+    oil_quality = result.scalar_one_or_none()
     if not oil_quality:
         return False
 
-    db.delete(oil_quality)
-    db.commit()
+    await db.delete(oil_quality)
+    await db.commit()
     return True

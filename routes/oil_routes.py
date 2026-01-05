@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from config.postgresql import get_db
 from controllers.oil_controller import (
     create_oil_quality,
@@ -15,9 +15,9 @@ router = APIRouter(prefix="/oil-qualities", tags=["oil-qualities"])
 
 
 @router.post("/", response_model=OilQualityResponse, status_code=201)
-def create_oil_quality_route(oil_quality: OilQualityCreate, db: Session = Depends(get_db)):
+async def create_oil_quality_route(oil_quality: OilQualityCreate, db: AsyncSession = Depends(get_db)):
     """Create a new oil quality"""
-    return create_oil_quality(
+    return await create_oil_quality(
         db,
         oil_quality.oil_grade,
         oil_quality.description
@@ -25,24 +25,24 @@ def create_oil_quality_route(oil_quality: OilQualityCreate, db: Session = Depend
 
 
 @router.get("/{oil_id}", response_model=OilQualityResponse)
-def get_oil_quality_route(oil_id: int, db: Session = Depends(get_db)):
+async def get_oil_quality_route(oil_id: int, db: AsyncSession = Depends(get_db)):
     """Get an oil quality by ID"""
-    oil_quality = get_oil_quality_by_id(db, oil_id)
+    oil_quality = await get_oil_quality_by_id(db, oil_id)
     if not oil_quality:
         raise HTTPException(status_code=404, detail="Oil quality not found")
     return oil_quality
 
 
 @router.get("/", response_model=List[OilQualityResponse])
-def get_all_oil_qualities_route(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def get_all_oil_qualities_route(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
     """Get all oil qualities"""
-    return get_all_oil_qualities(db, skip, limit)
+    return await get_all_oil_qualities(db, skip, limit)
 
 
 @router.put("/{oil_id}", response_model=OilQualityResponse)
-def update_oil_quality_route(oil_id: int, oil_quality: OilQualityUpdate, db: Session = Depends(get_db)):
+async def update_oil_quality_route(oil_id: int, oil_quality: OilQualityUpdate, db: AsyncSession = Depends(get_db)):
     """Update an oil quality"""
-    updated_oil_quality = update_oil_quality(
+    updated_oil_quality = await update_oil_quality(
         db,
         oil_id,
         oil_quality.oil_grade,
@@ -54,9 +54,9 @@ def update_oil_quality_route(oil_id: int, oil_quality: OilQualityUpdate, db: Ses
 
 
 @router.delete("/{oil_id}", status_code=204)
-def delete_oil_quality_route(oil_id: int, db: Session = Depends(get_db)):
+async def delete_oil_quality_route(oil_id: int, db: AsyncSession = Depends(get_db)):
     """Delete an oil quality"""
-    success = delete_oil_quality(db, oil_id)
+    success = await delete_oil_quality(db, oil_id)
     if not success:
         raise HTTPException(status_code=404, detail="Oil quality not found")
     return None

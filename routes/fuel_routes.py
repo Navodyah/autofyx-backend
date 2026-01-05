@@ -1,0 +1,53 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from config.postgresql import get_db
+from controllers.fuel_controller import (
+    create_fuel_type,
+    get_fuel_type_by_id,
+    get_all_fuel_types,
+    update_fuel_type,
+    delete_fuel_type
+)
+from schemas.fuel_schema import FuelTypeCreate, FuelTypeUpdate, FuelTypeResponse
+from typing import List
+
+router = APIRouter(prefix="/fuel-types", tags=["fuel-types"])
+
+
+@router.post("/", response_model=FuelTypeResponse, status_code=201)
+async def create_fuel_type_route(fuel_type: FuelTypeCreate, db: AsyncSession = Depends(get_db)):
+    """Create a new fuel type"""
+    return await create_fuel_type(db, fuel_type.fuel_type_id, fuel_type.fuel_type_name)
+
+
+@router.get("/{fuel_type_id}", response_model=FuelTypeResponse)
+async def get_fuel_type_route(fuel_type_id: int, db: AsyncSession = Depends(get_db)):
+    """Get a fuel type by ID"""
+    fuel_type = await get_fuel_type_by_id(db, fuel_type_id)
+    if not fuel_type:
+        raise HTTPException(status_code=404, detail="Fuel type not found")
+    return fuel_type
+
+
+@router.get("/", response_model=List[FuelTypeResponse])
+async def get_all_fuel_types_route(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
+    """Get all fuel types"""
+    return await get_all_fuel_types(db, skip, limit)
+
+
+@router.put("/{fuel_type_id}", response_model=FuelTypeResponse)
+async def update_fuel_type_route(fuel_type_id: int, fuel_type: FuelTypeUpdate, db: AsyncSession = Depends(get_db)):
+    """Update a fuel type"""
+    updated_fuel_type = await update_fuel_type(db, fuel_type_id, fuel_type.fuel_type_name)
+    if not updated_fuel_type:
+        raise HTTPException(status_code=404, detail="Fuel type not found")
+    return updated_fuel_type
+
+
+@router.delete("/{fuel_type_id}", status_code=204)
+async def delete_fuel_type_route(fuel_type_id: int, db: AsyncSession = Depends(get_db)):
+    """Delete a fuel type"""
+    success = await delete_fuel_type(db, fuel_type_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Fuel type not found")
+    return None

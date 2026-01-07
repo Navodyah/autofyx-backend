@@ -1,10 +1,18 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models.car_model import Model
 from typing import Optional
+from models.brand import Brand
 
 
-def create_model(db: Session, brand_id: int, model_name: str, start_year: Optional[int] = None, end_year: Optional[int] = None):
+async def create_model(db: AsyncSession, brand_id: int, model_name: str, start_year: Optional[int] = None, end_year: Optional[int] = None):
     """Create a new car model"""
+    # Verify brand exists
+    brand_result = await db.execute(select(Brand).filter(Brand.brand_id == brand_id))
+    if not brand_result.scalar_one_or_none():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Brand with ID {brand_id} does not exist")
+
     new_model = Model(
         brand_id=brand_id,
         model_name=model_name,
@@ -12,29 +20,34 @@ def create_model(db: Session, brand_id: int, model_name: str, start_year: Option
         end_year=end_year
     )
     db.add(new_model)
-    db.commit()
-    db.refresh(new_model)
+    await db.commit()
+    await db.refresh(new_model)
     return new_model
 
 
-def get_model_by_id(db: Session, model_id: int):
+
+async def get_model_by_id(db: AsyncSession, model_id: int):
     """Get a model by ID"""
-    return db.query(Model).filter(Model.model_id == model_id).first()
+    result = await db.execute(select(Model).filter(Model.model_id == model_id))
+    return result.scalar_one_or_none()
 
 
-def get_all_models(db: Session, skip: int = 0, limit: int = 100):
+async def get_all_models(db: AsyncSession, skip: int = 0, limit: int = 100):
     """Get all models with pagination"""
-    return db.query(Model).offset(skip).limit(limit).all()
+    result = await db.execute(select(Model).offset(skip).limit(limit))
+    return result.scalars().all()
 
 
-def get_models_by_brand(db: Session, brand_id: int):
+async def get_models_by_brand(db: AsyncSession, brand_id: int):
     """Get all models for a specific brand"""
-    return db.query(Model).filter(Model.brand_id == brand_id).all()
+    result = await db.execute(select(Model).filter(Model.brand_id == brand_id))
+    return result.scalars().all()
 
 
-def update_model(db: Session, model_id: int, brand_id: Optional[int] = None, model_name: Optional[str] = None, start_year: Optional[int] = None, end_year: Optional[int] = None):
+async def update_model(db: AsyncSession, model_id: int, brand_id: Optional[int] = None, model_name: Optional[str] = None, start_year: Optional[int] = None, end_year: Optional[int] = None):
     """Update a model"""
-    model = db.query(Model).filter(Model.model_id == model_id).first()
+    result = await db.execute(select(Model).filter(Model.model_id == model_id))
+    model = result.scalar_one_or_none()
     if not model:
         return None
 
@@ -47,17 +60,18 @@ def update_model(db: Session, model_id: int, brand_id: Optional[int] = None, mod
     if end_year is not None:
         model.end_year = end_year
 
-    db.commit()
-    db.refresh(model)
+    await db.commit()
+    await db.refresh(model)
     return model
 
 
-def delete_model(db: Session, model_id: int):
+async def delete_model(db: AsyncSession, model_id: int):
     """Delete a model"""
-    model = db.query(Model).filter(Model.model_id == model_id).first()
+    result = await db.execute(select(Model).filter(Model.model_id == model_id))
+    model = result.scalar_one_or_none()
     if not model:
         return False
 
-    db.delete(model)
-    db.commit()
+    await db.delete(model)
+    await db.commit()
     return True

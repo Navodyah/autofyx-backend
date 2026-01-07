@@ -21,21 +21,26 @@ def create_user_mongo(user: User):
         "username": user.username,
         "email": user.email,
         "hashed_password": hashed_pw,
+        "user_type": user.user_type if user.user_type else "user",
         "created_at": datetime.now(timezone.utc)
+
     }
 
     result = users_collection.insert_one(user_doc)
 
     return {
         "msg": "User created successfully",
-        "user_id": str(result.inserted_id)
+        "user_id": str(result.inserted_id),
+        "user_type": user.user_type
     }
 
 def login_user_mongo(credentials: UserLogin):
     db = get_database()
     users_collection = db["users"]
 
+    # Find user by email only
     user_doc = users_collection.find_one({"email": credentials.email})
+
     if not user_doc:
         return {"msg": "User not found"}
 
@@ -48,5 +53,6 @@ def login_user_mongo(credentials: UserLogin):
         "msg": "Login successful",
         "user_id": str(user_doc["_id"]),
         "username": user_doc["username"],
-        "email": user_doc["email"]
+        "email": user_doc["email"],
+        "user_type": user_doc.get("user_type", "user")  # Retrieve from database
     }

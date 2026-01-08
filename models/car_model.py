@@ -6,11 +6,10 @@ class Model(Base):
     __tablename__ = "models"
 
     model_id = Column(Integer, primary_key=True, index=True)
-    brand_id = Column(Integer, ForeignKey("brands.brand_id"))
+    brand_id = Column(Integer, ForeignKey("brands.brand_id", ondelete="CASCADE"), nullable=False)
     model_name = Column(String, nullable=False)
     start_year = Column(Integer)
     end_year = Column(Integer)
 
     brand = relationship("Brand", back_populates="models")
     vehicles = relationship("Vehicle", back_populates="model")
-    

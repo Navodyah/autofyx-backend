@@ -1,3 +1,4 @@
+# file: controllers/engine_controller.py
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.engine import EngineType
@@ -5,10 +6,9 @@ from typing import Optional
 from decimal import Decimal
 
 
-async def create_engine_type(db: AsyncSession, engine_type_id: int, engine_type_name: str, cylinders: int, engine_size: Decimal):
-    """Create a new engine type"""
+async def create_engine_type(db: AsyncSession, engine_type_name: str, cylinders: int, engine_size: Decimal):
+    """Create a new engine type (DB generates the ID)"""
     new_engine_type = EngineType(
-        engine_type_id=engine_type_id,
         engine_type_name=engine_type_name,
         cylinders=cylinders,
         engine_size=engine_size
@@ -20,19 +20,16 @@ async def create_engine_type(db: AsyncSession, engine_type_id: int, engine_type_
 
 
 async def get_engine_type_by_id(db: AsyncSession, engine_type_id: int):
-    """Get an engine type by ID"""
     result = await db.execute(select(EngineType).filter(EngineType.engine_type_id == engine_type_id))
     return result.scalar_one_or_none()
 
 
 async def get_all_engine_types(db: AsyncSession, skip: int = 0, limit: int = 100):
-    """Get all engine types with pagination"""
     result = await db.execute(select(EngineType).offset(skip).limit(limit))
     return result.scalars().all()
 
 
 async def update_engine_type(db: AsyncSession, engine_type_id: int, engine_type_name: Optional[str] = None, cylinders: Optional[int] = None, engine_size: Optional[Decimal] = None):
-    """Update an engine type"""
     result = await db.execute(select(EngineType).filter(EngineType.engine_type_id == engine_type_id))
     engine_type = result.scalar_one_or_none()
     if not engine_type:
@@ -51,7 +48,6 @@ async def update_engine_type(db: AsyncSession, engine_type_id: int, engine_type_
 
 
 async def delete_engine_type(db: AsyncSession, engine_type_id: int):
-    """Delete an engine type"""
     result = await db.execute(select(EngineType).filter(EngineType.engine_type_id == engine_type_id))
     engine_type = result.scalar_one_or_none()
     if not engine_type:

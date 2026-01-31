@@ -1,3 +1,4 @@
+# language: python
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.postgresql import get_db
@@ -11,7 +12,7 @@ from controllers.oil_controller import (
 from schemas.oil_schema import OilQualityCreate, OilQualityUpdate, OilQualityResponse
 from typing import List
 
-router = APIRouter(prefix="/oil-qualities", tags=["oil-qualities"])
+router = APIRouter(prefix="/oil_quality", tags=["oil-quality"])
 
 
 @router.post("/", response_model=OilQualityResponse, status_code=201)

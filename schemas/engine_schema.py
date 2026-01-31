@@ -9,8 +9,9 @@ class EngineTypeBase(BaseModel):
     engine_size: Decimal = Field(..., ge=0, decimal_places=1)
 
 
+# No engine_type_id required when creating; DB will generate it
 class EngineTypeCreate(EngineTypeBase):
-    engine_type_id: int
+    pass
 
 
 class EngineTypeUpdate(BaseModel):

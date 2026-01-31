@@ -5,9 +5,9 @@ from models.brand import Brand
 from typing import Optional
 
 
-async def create_brand(db: AsyncSession, brand_id: int, brand_name: str, country: Optional[str] = None):
+async def create_brand(db: AsyncSession, brand_name: str, country: Optional[str] = None):
     """Create a new brand"""
-    new_brand = Brand(brand_id=brand_id, brand_name=brand_name, country=country)
+    new_brand = Brand(brand_name=brand_name, country=country)
     db.add(new_brand)
     await db.commit()
     await db.refresh(new_brand)
@@ -15,6 +15,7 @@ async def create_brand(db: AsyncSession, brand_id: int, brand_name: str, country
         await db.rollback()
         raise ValueError("Failed to generate brand_id")
     return new_brand
+
 
 
 async def get_brand_by_id(db: AsyncSession, brand_id: int):

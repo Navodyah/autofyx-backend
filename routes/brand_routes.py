@@ -18,7 +18,8 @@ router = APIRouter(prefix="/brands", tags=["brands"])
 @router.post("/", response_model=BrandResponse, status_code=201)
 async def create_brand_route(brand: BrandCreate, db: AsyncSession = Depends(get_db)):
     """Create a new brand"""
-    return await create_brand(db, brand.brand_id, brand.brand_name, brand.country)
+    return await create_brand(db, brand.brand_name, brand.country)
+
 
 
 @router.get("/{brand_id}", response_model=BrandResponse)

@@ -1,45 +1,49 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models.vehicle_class import VehicleClass
-from typing import Optional
 
 
-def create_vehicle_class(db: Session, class_name: str):
+async def create_vehicle_class(db: AsyncSession, class_name: str):
     """Create a new vehicle class"""
     new_vehicle_class = VehicleClass(class_name=class_name)
     db.add(new_vehicle_class)
-    db.commit()
-    db.refresh(new_vehicle_class)
+    await db.commit()
+    await db.refresh(new_vehicle_class)
     return new_vehicle_class
 
 
-def get_vehicle_class_by_id(db: Session, class_id: int):
+async def get_vehicle_class_by_id(db: AsyncSession, class_id: int):
     """Get a vehicle class by ID"""
-    return db.query(VehicleClass).filter(VehicleClass.class_id == class_id).first()
+    result = await db.execute(select(VehicleClass).filter(VehicleClass.class_id == class_id))
+    return result.scalar_one_or_none()
 
 
-def get_all_vehicle_classes(db: Session, skip: int = 0, limit: int = 100):
+async def get_all_vehicle_classes(db: AsyncSession, skip: int = 0, limit: int = 100):
     """Get all vehicle classes with pagination"""
-    return db.query(VehicleClass).offset(skip).limit(limit).all()
+    result = await db.execute(select(VehicleClass).offset(skip).limit(limit))
+    return result.scalars().all()
 
 
-def update_vehicle_class(db: Session, class_id: int, class_name: str):
+async def update_vehicle_class(db: AsyncSession, class_id: int, class_name: str):
     """Update a vehicle class"""
-    vehicle_class = db.query(VehicleClass).filter(VehicleClass.class_id == class_id).first()
+    result = await db.execute(select(VehicleClass).filter(VehicleClass.class_id == class_id))
+    vehicle_class = result.scalar_one_or_none()
     if not vehicle_class:
         return None
 
     vehicle_class.class_name = class_name
-    db.commit()
-    db.refresh(vehicle_class)
+    await db.commit()
+    await db.refresh(vehicle_class)
     return vehicle_class
 
 
-def delete_vehicle_class(db: Session, class_id: int):
+async def delete_vehicle_class(db: AsyncSession, class_id: int):
     """Delete a vehicle class"""
-    vehicle_class = db.query(VehicleClass).filter(VehicleClass.class_id == class_id).first()
+    result = await db.execute(select(VehicleClass).filter(VehicleClass.class_id == class_id))
+    vehicle_class = result.scalar_one_or_none()
     if not vehicle_class:
         return False
 
-    db.delete(vehicle_class)
-    db.commit()
+    await db.delete(vehicle_class)
+    await db.commit()
     return True

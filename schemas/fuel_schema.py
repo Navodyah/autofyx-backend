@@ -5,8 +5,9 @@ class FuelTypeBase(BaseModel):
     fuel_type_name: str
 
 
+# Do not require fuel_type_id when creating; DB will generate it
 class FuelTypeCreate(FuelTypeBase):
-    fuel_type_id: int
+    pass
 
 
 class FuelTypeUpdate(FuelTypeBase):
@@ -18,3 +19,7 @@ class FuelTypeResponse(FuelTypeBase):
 
     class Config:
         from_attributes = True
+
+
+
+

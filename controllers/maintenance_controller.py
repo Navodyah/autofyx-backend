@@ -1,11 +1,12 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models.maintenance import MaintenanceCost
 from typing import Optional
 from decimal import Decimal
 from datetime import date
 
 
-def create_maintenance_cost(db: Session, vehicle_id: int, yearly_cost: Decimal, recorded_date: date, source: Optional[str] = None):
+async def create_maintenance_cost(db: AsyncSession, vehicle_id: int, yearly_cost: Decimal, recorded_date: date, source: Optional[str] = None):
     """Create a new maintenance cost record"""
     new_maintenance_cost = MaintenanceCost(
         vehicle_id=vehicle_id,
@@ -14,29 +15,33 @@ def create_maintenance_cost(db: Session, vehicle_id: int, yearly_cost: Decimal, 
         source=source
     )
     db.add(new_maintenance_cost)
-    db.commit()
-    db.refresh(new_maintenance_cost)
+    await db.commit()
+    await db.refresh(new_maintenance_cost)
     return new_maintenance_cost
 
 
-def get_maintenance_cost_by_id(db: Session, record_id: int):
+async def get_maintenance_cost_by_id(db: AsyncSession, record_id: int):
     """Get a maintenance cost record by ID"""
-    return db.query(MaintenanceCost).filter(MaintenanceCost.record_id == record_id).first()
+    result = await db.execute(select(MaintenanceCost).filter(MaintenanceCost.record_id == record_id))
+    return result.scalar_one_or_none()
 
 
-def get_all_maintenance_costs(db: Session, skip: int = 0, limit: int = 100):
+async def get_all_maintenance_costs(db: AsyncSession, skip: int = 0, limit: int = 100):
     """Get all maintenance cost records with pagination"""
-    return db.query(MaintenanceCost).offset(skip).limit(limit).all()
+    result = await db.execute(select(MaintenanceCost).offset(skip).limit(limit))
+    return result.scalars().all()
 
 
-def get_maintenance_costs_by_vehicle(db: Session, vehicle_id: int):
+async def get_maintenance_costs_by_vehicle(db: AsyncSession, vehicle_id: int):
     """Get all maintenance cost records for a specific vehicle"""
-    return db.query(MaintenanceCost).filter(MaintenanceCost.vehicle_id == vehicle_id).all()
+    result = await db.execute(select(MaintenanceCost).filter(MaintenanceCost.vehicle_id == vehicle_id))
+    return result.scalars().all()
 
 
-def update_maintenance_cost(db: Session, record_id: int, vehicle_id: Optional[int] = None, yearly_cost: Optional[Decimal] = None, recorded_date: Optional[date] = None, source: Optional[str] = None):
+async def update_maintenance_cost(db: AsyncSession, record_id: int, vehicle_id: Optional[int] = None, yearly_cost: Optional[Decimal] = None, recorded_date: Optional[date] = None, source: Optional[str] = None):
     """Update a maintenance cost record"""
-    maintenance_cost = db.query(MaintenanceCost).filter(MaintenanceCost.record_id == record_id).first()
+    result = await db.execute(select(MaintenanceCost).filter(MaintenanceCost.record_id == record_id))
+    maintenance_cost = result.scalar_one_or_none()
     if not maintenance_cost:
         return None
 
@@ -49,17 +54,18 @@ def update_maintenance_cost(db: Session, record_id: int, vehicle_id: Optional[in
     if source is not None:
         maintenance_cost.source = source
 
-    db.commit()
-    db.refresh(maintenance_cost)
+    await db.commit()
+    await db.refresh(maintenance_cost)
     return maintenance_cost
 
 
-def delete_maintenance_cost(db: Session, record_id: int):
+async def delete_maintenance_cost(db: AsyncSession, record_id: int):
     """Delete a maintenance cost record"""
-    maintenance_cost = db.query(MaintenanceCost).filter(MaintenanceCost.record_id == record_id).first()
+    result = await db.execute(select(MaintenanceCost).filter(MaintenanceCost.record_id == record_id))
+    maintenance_cost = result.scalar_one_or_none()
     if not maintenance_cost:
         return False
 
-    db.delete(maintenance_cost)
-    db.commit()
+    await db.delete(maintenance_cost)
+    await db.commit()
     return True

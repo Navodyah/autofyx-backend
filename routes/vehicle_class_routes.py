@@ -11,7 +11,7 @@ from controllers.vehicle_class_controller import (
 from schemas.vehicle_class_schema import VehicleClassCreate, VehicleClassUpdate, VehicleClassResponse
 from typing import List
 
-router = APIRouter(prefix="/vehicle-classes", tags=["vehicle-classes"])
+router = APIRouter(prefix="/vehicle_classes", tags=["vehicle-classes"])
 
 
 @router.post("/", response_model=VehicleClassResponse, status_code=201)

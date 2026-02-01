@@ -19,6 +19,7 @@ class Vehicle(Base):
 
     # Attributes
     tyre_size = Column(String)
+    manufacturing_year = Column(Integer)
     fuel_efficiency_highway = Column(DECIMAL(5, 2))
     fuel_efficiency_combined = Column(DECIMAL(5, 2))
     description = Column(Text)

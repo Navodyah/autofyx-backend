@@ -15,6 +15,7 @@ from typing import List
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
+
 @router.post("/", response_model=VehicleResponse, status_code=201)
 def create_vehicle_route(vehicle: VehicleCreate, db: Session = Depends(get_db)):
     """Create a new vehicle"""

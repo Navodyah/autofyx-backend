@@ -16,6 +16,7 @@ def create_vehicle(
     fuel_efficiency_highway: Optional[Decimal] = None,
     fuel_efficiency_combined: Optional[Decimal] = None,
     description: Optional[str] = None
+
 ):
     """Create a new vehicle"""
     new_vehicle = Vehicle(

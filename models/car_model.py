@@ -13,3 +13,4 @@ class Model(Base):
 
     brand = relationship("Brand", back_populates="models")
     vehicles = relationship("Vehicle", back_populates="model")
+

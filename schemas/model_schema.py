@@ -22,3 +22,4 @@ class ModelResponse(BaseModel):
 
     class Config:
         from_attributes = True
+

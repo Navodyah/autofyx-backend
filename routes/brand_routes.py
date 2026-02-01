@@ -15,6 +15,7 @@ from typing import List
 router = APIRouter(prefix="/brands", tags=["brands"])
 
 
+
 @router.post("/", response_model=BrandResponse, status_code=201)
 async def create_brand_route(brand: BrandCreate, db: AsyncSession = Depends(get_db)):
     """Create a new brand"""

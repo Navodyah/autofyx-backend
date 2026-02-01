@@ -43,6 +43,8 @@ async def create_model_route(model: ModelCreate, db: AsyncSession = Depends(get_
 
 
 
+
+
 @router.get("/{model_id}", response_model=ModelResponse)
 async def get_model_route(model_id: int, db: AsyncSession = Depends(get_db)):
     """Get a model by ID"""

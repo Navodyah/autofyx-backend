@@ -17,6 +17,7 @@ class Vehicle(Base):
     transmission_id = Column(Integer, ForeignKey("transmissions.transmission_id"))
     oil_id = Column(Integer, ForeignKey("oil_quality.oil_id"))
 
+
     # Attributes
     tyre_size = Column(String)
     fuel_efficiency_highway = Column(DECIMAL(5, 2))

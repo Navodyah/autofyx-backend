@@ -18,6 +18,7 @@ async def create_brand(db: AsyncSession, brand_name: str, country: Optional[str]
 
 
 
+
 async def get_brand_by_id(db: AsyncSession, brand_id: int):
     """Get a brand by ID"""
     result = await db.execute(select(Brand).filter(Brand.brand_id == brand_id))

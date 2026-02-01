@@ -26,6 +26,7 @@ async def create_model(db: AsyncSession, brand_id: int, model_name: str, start_y
 
 
 
+
 async def get_model_by_id(db: AsyncSession, model_id: int):
     """Get a model by ID"""
     result = await db.execute(select(Model).filter(Model.model_id == model_id))

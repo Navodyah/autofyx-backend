@@ -4,7 +4,7 @@ from models.maintenance import MaintenanceCost
 from typing import Optional
 from decimal import Decimal
 from datetime import date
-
+from sqlalchemy import delete as sa_delete
 
 async def create_maintenance_cost(db: AsyncSession, vehicle_id: int, yearly_cost: Decimal, recorded_date: date, source: Optional[str] = None):
     """Create a new maintenance cost record"""
@@ -59,13 +59,12 @@ async def update_maintenance_cost(db: AsyncSession, record_id: int, vehicle_id: 
     return maintenance_cost
 
 
-async def delete_maintenance_cost(db: AsyncSession, record_id: int):
-    """Delete a maintenance cost record"""
-    result = await db.execute(select(MaintenanceCost).filter(MaintenanceCost.record_id == record_id))
-    maintenance_cost = result.scalar_one_or_none()
-    if not maintenance_cost:
-        return False
-
-    await db.delete(maintenance_cost)
+async def delete_maintenance_cost(db: AsyncSession, record_id: int) -> bool:
+    """
+    Delete a maintenance cost record using a SQL DELETE and commit.
+    Returns True if a row was deleted, False otherwise.
+    """
+    stmt = sa_delete(MaintenanceCost).where(MaintenanceCost.record_id == record_id)
+    result = await db.execute(stmt)
     await db.commit()
-    return True
+    return (result.rowcount or 0) > 0

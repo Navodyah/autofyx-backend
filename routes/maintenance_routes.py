@@ -64,10 +64,10 @@ async def update_maintenance_cost_route(record_id: int, maintenance_cost: Mainte
     return updated_maintenance_cost
 
 
-@router.delete("/{record_id}", status_code=204)
+@router.delete("/{record_id}")
 async def delete_maintenance_cost_route(record_id: int, db: AsyncSession = Depends(get_db)):
-    """Delete a maintenance cost record"""
+    """Delete a maintenance cost record and return JSON so clients can refresh view reliably."""
     success = await delete_maintenance_cost(db, record_id)
     if not success:
         raise HTTPException(status_code=404, detail="Maintenance cost record not found")
-    return None
+    return {"deleted": record_id}

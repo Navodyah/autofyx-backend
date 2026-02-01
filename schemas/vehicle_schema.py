@@ -1,3 +1,4 @@
+# python
 from pydantic import BaseModel, Field
 from typing import Optional
 from decimal import Decimal
@@ -11,6 +12,8 @@ class VehicleBase(BaseModel):
     fuel_type_id: int
     transmission_id: int
     oil_id: int
+    # make optional so responses don't fail when DB row has null
+    manufacturing_year: Optional[int] = None
     tyre_size: Optional[str] = None
     fuel_efficiency_highway: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     fuel_efficiency_combined: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
@@ -18,7 +21,8 @@ class VehicleBase(BaseModel):
 
 
 class VehicleCreate(VehicleBase):
-    pass
+    # require manufacturing_year for create operations
+    manufacturing_year: int
 
 
 class VehicleUpdate(BaseModel):
@@ -28,6 +32,7 @@ class VehicleUpdate(BaseModel):
     fuel_type_id: Optional[int] = None
     transmission_id: Optional[int] = None
     oil_id: Optional[int] = None
+    manufacturing_year: Optional[int] = None
     tyre_size: Optional[str] = None
     fuel_efficiency_highway: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     fuel_efficiency_combined: Optional[Decimal] = Field(None, ge=0, decimal_places=2)

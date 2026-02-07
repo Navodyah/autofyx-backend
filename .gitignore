@@ -76,3 +76,17 @@ desktop.ini
 
 # Misc
 celerybeat-schedule
+
+# If you prefer to edit ` .gitignore` manually, add these lines:
+*.pkl
+vehicle_feature_columns.pkl
+vehicle_label_encoders.pkl
+vehicle_ranking_models.pkl
+*.pickle
+data/*.pkl
+data/models/*.pkl
+models/*.pkl
+# ML models / serialized files
+*.joblib
+
+

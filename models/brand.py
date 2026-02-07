@@ -9,4 +9,4 @@ class Brand(Base):
     brand_name = Column(String, nullable=False)
     country = Column(String)
 
-    models = relationship("Model", back_populates="brand")
+    vehicles = relationship("Vehicle", back_populates="brand")

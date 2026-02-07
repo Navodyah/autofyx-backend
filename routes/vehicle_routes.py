@@ -19,10 +19,10 @@ router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 @router.post("/", response_model=VehicleResponse, status_code=201)
 async def create_vehicle_route(vehicle: VehicleCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new vehicle"""
     return await create_vehicle(
         db,
-        vehicle.model_id,
+        vehicle.model_name,
+        vehicle.brand_id,
         vehicle.class_id,
         vehicle.engine_type_id,
         vehicle.fuel_type_id,
@@ -30,6 +30,7 @@ async def create_vehicle_route(vehicle: VehicleCreate, db: AsyncSession = Depend
         vehicle.oil_id,
         vehicle.manufacturing_year,
         vehicle.tyre_size,
+        vehicle.engine_size,
         vehicle.fuel_efficiency_highway,
         vehicle.fuel_efficiency_combined,
         vehicle.description
@@ -49,9 +50,9 @@ async def get_all_vehicles_route(skip: int = 0, limit: int = 100, db: AsyncSessi
     return await get_all_vehicles(db, skip, limit)
 
 
-@router.get("/model/{model_id}", response_model=List[VehicleResponse])
-async def get_vehicles_by_model_route(model_id: int, db: AsyncSession = Depends(get_db)):
-    return await get_vehicles_by_model(db, model_id)
+@router.get("/model/{model_name}", response_model=List[VehicleResponse])
+async def get_vehicles_by_model_route(model_name: str, db: AsyncSession = Depends(get_db)):
+    return await get_vehicles_by_model(db, model_name)
 
 
 @router.put("/{vehicle_id}", response_model=VehicleResponse)
@@ -59,7 +60,8 @@ async def update_vehicle_route(vehicle_id: int, vehicle: VehicleUpdate, db: Asyn
     updated_vehicle = await update_vehicle(
         db,
         vehicle_id,
-        vehicle.model_id,
+        vehicle.model_name,
+        vehicle.brand_id,
         vehicle.class_id,
         vehicle.engine_type_id,
         vehicle.fuel_type_id,
@@ -67,6 +69,7 @@ async def update_vehicle_route(vehicle_id: int, vehicle: VehicleUpdate, db: Asyn
         vehicle.oil_id,
         vehicle.manufacturing_year,
         vehicle.tyre_size,
+        vehicle.engine_size,
         vehicle.fuel_efficiency_highway,
         vehicle.fuel_efficiency_combined,
         vehicle.description
@@ -78,10 +81,6 @@ async def update_vehicle_route(vehicle_id: int, vehicle: VehicleUpdate, db: Asyn
 
 @router.delete("/{vehicle_id}")
 async def delete_vehicle_route(vehicle_id: int, db: AsyncSession = Depends(get_db)):
-    """
-    Delete route now returns JSON (HTTP 200) with the deleted id to avoid client parsing issues
-    with 204 responses and to make frontend refresh handling simpler.
-    """
     success = await delete_vehicle(db, vehicle_id)
     if not success:
         raise HTTPException(status_code=404, detail="Vehicle not found")

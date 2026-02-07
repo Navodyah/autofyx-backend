@@ -1,3 +1,4 @@
+# python
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.postgresql import get_db
@@ -16,12 +17,10 @@ router = APIRouter(prefix="/engine-types", tags=["engine-types"])
 
 @router.post("/", response_model=EngineTypeResponse, status_code=201)
 async def create_engine_type_route(engine_type: EngineTypeCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new engine type"""
     return await create_engine_type(
         db,
         engine_type.engine_type_name,
-        engine_type.cylinders,
-        engine_type.engine_size
+        engine_type.cylinders
     )
 
 
@@ -44,8 +43,7 @@ async def update_engine_type_route(engine_type_id: int, engine_type: EngineTypeU
         db,
         engine_type_id,
         engine_type.engine_type_name,
-        engine_type.cylinders,
-        engine_type.engine_size
+        engine_type.cylinders
     )
     if not updated_engine_type:
         raise HTTPException(status_code=404, detail="Engine type not found")

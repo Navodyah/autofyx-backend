@@ -25,7 +25,9 @@ from routes.vehicle_routes import router as vehicle_router
 from routes.vehicle_class_routes import router as vehicle_class_router
 from fastapi import FastAPI
 from routes.recommender_routes  import router as recommendation_router
-
+from routes.compare_routes import router as compare_router
+from routes.lookup_routes import router as lookup_router
+from routes.user_profile_routes import router as user_profile_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -68,6 +70,11 @@ app.include_router(transmission_router)
 app.include_router(vehicle_router)
 app.include_router(recommendation_router)
 app.include_router(vehicle_class_router)
+
+app.include_router(compare_router)
+app.include_router(lookup_router)
+app.include_router(user_profile_router)
+
 app.include_router(maintenance_router, prefix="/maintenance_costs", include_in_schema=False)
 
 # Aliases: redirect underscore path to hyphen path so /maintenance_costs/* works

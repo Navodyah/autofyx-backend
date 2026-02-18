@@ -23,6 +23,9 @@ from routes.oil_routes import router as oil_router
 from routes.transmission_routes import router as transmission_router
 from routes.vehicle_routes import router as vehicle_router
 from routes.vehicle_class_routes import router as vehicle_class_router
+from fastapi import FastAPI
+from routes.recommender_routes  import router as recommendation_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -63,6 +66,7 @@ app.include_router(maintenance_router)      # /maintenance-costs
 app.include_router(oil_router)
 app.include_router(transmission_router)
 app.include_router(vehicle_router)
+app.include_router(recommendation_router)
 app.include_router(vehicle_class_router)
 app.include_router(maintenance_router, prefix="/maintenance_costs", include_in_schema=False)
 

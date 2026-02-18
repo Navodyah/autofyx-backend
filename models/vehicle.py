@@ -1,3 +1,5 @@
+# python
+# File: `models/vehicle.py`
 from sqlalchemy import Column, Integer, String, DECIMAL, ForeignKey, TIMESTAMP, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -10,8 +12,9 @@ class Vehicle(Base):
     vehicle_id = Column(Integer, primary_key=True, index=True)
 
     # Foreign Keys
-    model_id = Column(Integer, ForeignKey("models.model_id"))
+    model_name = Column(String)
     class_id = Column(Integer, ForeignKey("vehicle_classes.class_id"))
+    brand_id = Column(Integer, ForeignKey("brands.brand_id"))
     engine_type_id = Column(Integer, ForeignKey("engine_types.engine_type_id"))
     fuel_type_id = Column(Integer, ForeignKey("fuel_types.fuel_type_id"))
     transmission_id = Column(Integer, ForeignKey("transmissions.transmission_id"))
@@ -19,6 +22,7 @@ class Vehicle(Base):
 
     # Attributes
     tyre_size = Column(String)
+    engine_size = Column(DECIMAL(4, 1))
     manufacturing_year = Column(Integer)
     fuel_efficiency_highway = Column(DECIMAL(5, 2))
     fuel_efficiency_combined = Column(DECIMAL(5, 2))
@@ -26,7 +30,7 @@ class Vehicle(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     # Relationships
-    model = relationship("Model", back_populates="vehicles")
+    brand = relationship("Brand", back_populates="vehicles")
     vehicle_class = relationship("VehicleClass", back_populates="vehicles")
     engine_type = relationship("EngineType", back_populates="vehicles")
     fuel_type = relationship("FuelType", back_populates="vehicles")

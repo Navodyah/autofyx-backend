@@ -9,19 +9,19 @@ from fastapi import HTTPException
 from sqlalchemy import delete as sa_delete
 
 from models.vehicle import Vehicle
-from models.car_model import Model
 from models.vehicle_class import VehicleClass
 from models.engine import EngineType
 from models.fuel import FuelType
 from models.transmission import Transmission
 from models.oil import OilQuality
+from models.brand import Brand
 
 
 async def get_all_vehicles(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Vehicle]:
     stmt = (
         select(Vehicle)
         .options(
-            selectinload(Vehicle.model),
+            selectinload(Vehicle.brand),
             selectinload(Vehicle.vehicle_class),
             selectinload(Vehicle.engine_type),
             selectinload(Vehicle.fuel_type),
@@ -35,21 +35,18 @@ async def get_all_vehicles(db: AsyncSession, skip: int = 0, limit: int = 100) ->
     return result.scalars().all()
 
 
-async def get_vehicles_by_model(db: AsyncSession, model_id: int) -> List[Vehicle]:
-    """
-    Return list of Vehicle instances for a given model_id with relationships loaded.
-    """
+async def get_vehicles_by_model(db: AsyncSession, model_name: str) -> List[Vehicle]:
     stmt = (
         select(Vehicle)
         .options(
-            selectinload(Vehicle.model),
+            selectinload(Vehicle.brand),
             selectinload(Vehicle.vehicle_class),
             selectinload(Vehicle.engine_type),
             selectinload(Vehicle.fuel_type),
             selectinload(Vehicle.transmission),
             selectinload(Vehicle.oil_quality),
         )
-        .filter(Vehicle.model_id == model_id)
+        .filter(Vehicle.model_name == model_name)
     )
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -57,7 +54,8 @@ async def get_vehicles_by_model(db: AsyncSession, model_id: int) -> List[Vehicle
 
 async def create_vehicle(
     db: AsyncSession,
-    model_id: int,
+    model_name: Optional[str],
+    brand_id: Optional[int],
     class_id: int,
     engine_type_id: int,
     fuel_type_id: int,
@@ -65,15 +63,12 @@ async def create_vehicle(
     oil_id: int,
     manufacturing_year: int,
     tyre_size: Optional[str] = None,
+    engine_size: Optional[Decimal] = None,
     fuel_efficiency_highway: Optional[Decimal] = None,
     fuel_efficiency_combined: Optional[Decimal] = None,
     description: Optional[str] = None
 ):
     # Validate foreign keys
-    model = await db.execute(select(Model).filter(Model.model_id == model_id))
-    if not model.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail=f"Model with ID {model_id} does not exist")
-
     vehicle_class = await db.execute(select(VehicleClass).filter(VehicleClass.class_id == class_id))
     if not vehicle_class.scalar_one_or_none():
         raise HTTPException(status_code=404, detail=f"Vehicle class with ID {class_id} does not exist")
@@ -94,13 +89,20 @@ async def create_vehicle(
     if not oil_quality.scalar_one_or_none():
         raise HTTPException(status_code=404, detail=f"Oil quality with ID {oil_id} does not exist")
 
+    if brand_id is not None:
+        brand = await db.execute(select(Brand).filter(Brand.brand_id == brand_id))
+        if not brand.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail=f"Brand with ID {brand_id} does not exist")
+
     new_vehicle = Vehicle(
-        model_id=model_id,
+        model_name=model_name,
+        brand_id=brand_id,
         class_id=class_id,
         engine_type_id=engine_type_id,
         fuel_type_id=fuel_type_id,
         transmission_id=transmission_id,
         oil_id=oil_id,
+        engine_size=engine_size,
         manufacturing_year=manufacturing_year,
         tyre_size=tyre_size,
         fuel_efficiency_highway=fuel_efficiency_highway,
@@ -116,7 +118,7 @@ async def create_vehicle(
 async def get_vehicle_by_id(db: AsyncSession, vehicle_id: int) -> Optional[Vehicle]:
     result = await db.execute(
         select(Vehicle).options(
-            selectinload(Vehicle.model),
+            selectinload(Vehicle.brand),
             selectinload(Vehicle.vehicle_class),
             selectinload(Vehicle.engine_type),
             selectinload(Vehicle.fuel_type),
@@ -130,7 +132,8 @@ async def get_vehicle_by_id(db: AsyncSession, vehicle_id: int) -> Optional[Vehic
 async def update_vehicle(
     db: AsyncSession,
     vehicle_id: int,
-    model_id: Optional[int] = None,
+    model_name: Optional[str] = None,
+    brand_id: Optional[int] = None,
     class_id: Optional[int] = None,
     engine_type_id: Optional[int] = None,
     fuel_type_id: Optional[int] = None,
@@ -138,6 +141,7 @@ async def update_vehicle(
     oil_id: Optional[int] = None,
     manufacturing_year: Optional[int] = None,
     tyre_size: Optional[str] = None,
+    engine_size: Optional[Decimal] = None,
     fuel_efficiency_highway: Optional[Decimal] = None,
     fuel_efficiency_combined: Optional[Decimal] = None,
     description: Optional[str] = None
@@ -147,8 +151,15 @@ async def update_vehicle(
     if not vehicle:
         return None
 
-    if model_id is not None:
-        vehicle.model_id = model_id
+    if brand_id is not None:
+        brand = await db.execute(select(Brand).filter(Brand.brand_id == brand_id))
+        if not brand.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail=f"Brand with ID {brand_id} does not exist")
+
+    if model_name is not None:
+        vehicle.model_name = model_name
+    if brand_id is not None:
+        vehicle.brand_id = brand_id
     if class_id is not None:
         vehicle.class_id = class_id
     if engine_type_id is not None:
@@ -159,6 +170,8 @@ async def update_vehicle(
         vehicle.transmission_id = transmission_id
     if oil_id is not None:
         vehicle.oil_id = oil_id
+    if engine_size is not None:
+        vehicle.engine_size = engine_size
     if manufacturing_year is not None:
         vehicle.manufacturing_year = manufacturing_year
     if tyre_size is not None:
@@ -176,12 +189,7 @@ async def update_vehicle(
 
 
 async def delete_vehicle(db: AsyncSession, vehicle_id: int) -> bool:
-    """
-    Delete a vehicle using a SQL DELETE statement and commit.
-    Returns True if a row was deleted, False otherwise.
-    """
     stmt = sa_delete(Vehicle).where(Vehicle.vehicle_id == vehicle_id)
     result = await db.execute(stmt)
     await db.commit()
-    # rowcount indicates how many rows were affected
     return (result.rowcount or 0) > 0

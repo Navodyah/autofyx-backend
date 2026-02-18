@@ -3,6 +3,8 @@ from config.mongodb import get_database
 from models.user_models import User, UserLogin
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+from utils.jwt_handler import create_access_token
+
 
 pwd_hasher = PasswordHasher()
 
@@ -38,9 +40,7 @@ def login_user_mongo(credentials: UserLogin):
     db = get_database()
     users_collection = db["users"]
 
-    # Find user by email only
     user_doc = users_collection.find_one({"email": credentials.email})
-
     if not user_doc:
         return {"msg": "User not found"}
 
@@ -49,10 +49,19 @@ def login_user_mongo(credentials: UserLogin):
     except VerifyMismatchError:
         return {"msg": "Incorrect password"}
 
+    # ✅ JWT token generate (sub = user_id)
+    token = create_access_token({
+        "sub": str(user_doc["_id"]),
+        "user_type": user_doc.get("user_type", "user"),
+        "email": user_doc["email"]
+    })
+
     return {
         "msg": "Login successful",
+        "access_token": token,          # ✅ add
+        "token_type": "bearer",         # ✅ add
         "user_id": str(user_doc["_id"]),
         "username": user_doc["username"],
         "email": user_doc["email"],
-        "user_type": user_doc.get("user_type", "user")  # Retrieve from database
+        "user_type": user_doc.get("user_type", "user")
     }

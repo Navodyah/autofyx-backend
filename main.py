@@ -24,7 +24,7 @@ from routes.transmission_routes import router as transmission_router
 from routes.vehicle_routes import router as vehicle_router
 from routes.vehicle_class_routes import router as vehicle_class_router
 from fastapi import FastAPI
-from routes.recommender_routes  import router as recommendation_router
+from routes.recommender_routes  import router as recommender_router
 from routes.compare_routes import router as compare_router
 from routes.lookup_routes import router as lookup_router
 from routes.user_profile_routes import router as user_profile_router
@@ -68,7 +68,7 @@ app.include_router(maintenance_router)      # /maintenance-costs
 app.include_router(oil_router)
 app.include_router(transmission_router)
 app.include_router(vehicle_router)
-app.include_router(recommendation_router)
+app.include_router(recommender_router)
 app.include_router(vehicle_class_router)
 
 app.include_router(compare_router)

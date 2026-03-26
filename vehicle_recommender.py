@@ -179,6 +179,7 @@ class VehicleRecommender:
             Number of recommendations to return
         """
 
+
         if self.vehicle_data is None:
             raise ValueError("Please load vehicle inventory first using load_vehicle_inventory()")
 

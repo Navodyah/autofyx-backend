@@ -1,5 +1,7 @@
 # File: `config/postgresql.py`
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -7,7 +9,13 @@ from contextlib import contextmanager
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# Load .env file if present
+# Load .env from common project locations if present.
+CONFIG_DIR = Path(__file__).resolve().parent
+API_DIR = CONFIG_DIR.parent
+PROJECT_ROOT = API_DIR.parent.parent
+
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(API_DIR / ".env")
 load_dotenv()
 
 DB_HOST = os.getenv("POSTGRES_SERVER") or os.getenv("DB_HOST")

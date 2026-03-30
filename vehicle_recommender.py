@@ -3,14 +3,14 @@ Vehicle Recommendation System - User Interface
 Get personalized vehicle recommendations based on your preferences
 """
 
-import warnings
-from typing import Dict
-
-import joblib
-import os
 import pandas as pd
+import numpy as np
+import joblib
+from typing import Dict
+import warnings
 
 warnings.filterwarnings('ignore')
+
 
 class VehicleRecommender:
     def __init__(self):
@@ -18,19 +18,41 @@ class VehicleRecommender:
         self.label_encoders = joblib.load("vehicle_label_encoders.pkl")
         self.feature_cols = joblib.load("vehicle_feature_columns.pkl")
         self.vehicle_data = None
-        self.models_dir = "trained_models"
 
     def load_vehicle_inventory(self, filepath):
         """Load vehicle data from CSV"""
         df = pd.read_csv(filepath)
 
+        # Rename columns for consistency (same as training)
+        column_mapping = {
+            'Engine Type': 'ENGINE TYPE',
+            'TRANSMISSION': 'Transmission',
+            'MAKE': 'Make',
+            'MODEL': 'Model'
+        }
+        df = df.rename(columns=column_mapping)
+
         # Convert numeric columns from strings to numbers
         numeric_cols = ["YEAR", "ENGINE SIZE", "CYLINDERS", "COMB (L/100 km)",
-                        "COMB (mpg)", "HWY (L/100 km)", "FUEL CONSUMPTION HWY (L/100 km)", "EMISSIONS"]
+                        "COMB (mpg)", "HWY (L/100 km)", "EMISSIONS"]
 
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # Add HORSEPOWER estimate if not present
+        if 'HORSEPOWER' not in df.columns:
+            df['HORSEPOWER'] = df['ENGINE SIZE'] * df['CYLINDERS'] * 20
+
+        # Add MAINTENANCE COST estimate if not present
+        if 'MAINTENANCE COST' not in df.columns:
+            base_cost = 50000
+            df['MAINTENANCE COST'] = (
+                    base_cost +
+                    df['ENGINE SIZE'] * 30000 +
+                    df['CYLINDERS'] * 15000 +
+                    (2024 - df['YEAR']) * 5000
+            )
 
         # Store original data before encoding
         self.original_data = df.copy()
@@ -43,104 +65,94 @@ class VehicleRecommender:
     def _prepare_vehicle_data(self, df):
         """Apply same feature engineering as training"""
 
-        # Define expected numeric columns
-        numeric_cols = ["YEAR", "ENGINE SIZE", "CYLINDERS", "COMB (L/100 km)",
-                        "COMB (mpg)", "HWY (L/100 km)", "FUEL CONSUMPTION HWY (L/100 km)", "EMISSIONS"]
-
-        # Convert numeric columns first
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-
-        # Fill missing values - separate handling for numeric and categorical
+        # Fill missing values
         for col in df.columns:
-            if col in numeric_cols:
-                # Only fill numeric columns with median
-                if df[col].notna().any():
-                    df[col].fillna(df[col].median(), inplace=True)
-                else:
-                    df[col].fillna(0, inplace=True)
-            elif df[col].dtype == "object":
-                # Fill categorical columns with "Unknown"
+            if df[col].dtype in ["object", "string"]:
                 df[col].fillna("Unknown", inplace=True)
+            elif pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].median(), inplace=True)
 
-        # Rest of the code remains the same...
-        # Engine features
+        # Engine features (same as training)
         def map_engine_features(e):
             if e == "I":
-                return pd.Series([5, 2, 5])
+                return pd.Series([1.7, 0.7, 6.8])
             elif e == "V":
-                return pd.Series([9, 8, 3])
+                return pd.Series([6.4, 3.4, 2.0])
+            elif e == "W":
+                return pd.Series([10.0, 10.0, 2.4])
             else:
-                return pd.Series([5, 5, 5])
+                return pd.Series([3.0, 2.0, 4.0])
 
         df[["engine_power_score", "engine_maintenance_cost", "engine_efficiency_score"]] = \
-            df["Engine Type"].apply(map_engine_features)
+            df["ENGINE TYPE"].apply(map_engine_features)
 
-        # ... continue with rest of the method
-
-        # Transmission features
+        # Transmission features (same as training)
         def map_transmission(t):
-            if t == "A":
-                return pd.Series([8, 8, 8])
-            elif t == "AM":
-                return pd.Series([6, 5, 7])
-            elif t == "AS":
-                return pd.Series([9, 7, 10])
-            elif t == "AV":
-                return pd.Series([4, 3, 4])
+            t_upper = str(t).upper()
+            if 'CVT' in t_upper:
+                return pd.Series([1.5, 0.5, 3.7])
+            elif 'AMT' in t_upper or 'AGS' in t_upper:
+                return pd.Series([0.2, 0.1, 3.3])
+            elif 'DCT' in t_upper or 'DSG' in t_upper or 'PDK' in t_upper or 'S-TRONIC' in t_upper:
+                return pd.Series([4.6, 3.0, 4.8])
+            elif 'MANUAL' in t_upper:
+                return pd.Series([2.1, 1.0, 4.0])
+            elif 'SINGLE' in t_upper:
+                return pd.Series([1.5, 0.3, 4.0])
             else:
-                return pd.Series([5, 5, 5])
+                return pd.Series([3.5, 1.8, 4.0])
 
         df[["trans_performance_score", "trans_maintenance_score", "driving_pleasure_score"]] = \
-            df["TRANSMISSION"].apply(map_transmission)
+            df["Transmission"].apply(map_transmission)
 
-        # Brand features
+        # Brand features (same as training)
         def brand_scores(make):
             make = str(make).lower()
-            if any(b in make for b in ["toyota", "nissan", "honda", "lexus", "mazda", "suzuki", "mitsubishi"]):
-                return pd.Series([9, 2, 6])
-            if any(b in make for b in ["bmw", "benz", "mercedes", "audi"]):
-                return pd.Series([9, 9, 9])
-            if any(b in make for b in ["ford", "chevrolet", "dodge", "gmc"]):
-                return pd.Series([7, 5, 8])
-            return pd.Series([6, 5, 5])
+            if any(b in make for b in ["toyota", "nissan", "honda", "lexus", "mazda",
+                                       "suzuki", "mitsubishi", "subaru", "daihatsu",
+                                       "isuzu", "perodua"]):
+                return pd.Series([7.7, 0.9, 2.6])
+            elif any(b in make for b in ["bmw", "benz", "mercedes", "audi", "volkswagen", "porsche"]):
+                return pd.Series([2.9, 3.3, 4.9])
+            elif any(b in make for b in ["ford", "chevrolet", "dodge", "gmc"]):
+                return pd.Series([9.0, 0.2, 0.7])
+            elif any(b in make for b in ["land rover", "range rover", "jaguar"]):
+                return pd.Series([3.5, 3.0, 5.4])
+            elif any(b in make for b in ["volvo", "peugeot", "renault", "citroen"]):
+                return pd.Series([7.7, 0.9, 1.8])
+            elif any(b in make for b in ["ferrari", "lamborghini", "maserati", "alfa"]):
+                return pd.Series([1.5, 7.0, 9.5])
+            elif any(b in make for b in ["hyundai", "kia", "genesis"]):
+                return pd.Series([8.0, 1.2, 2.0])
+            else:
+                return pd.Series([6.5, 1.5, 1.5])
 
         df[["brand_reliability_score", "brand_maintenance_cost", "brand_performance_bias"]] = \
-            df["MAKE"].apply(brand_scores)
+            df["Make"].apply(brand_scores)
 
-        # Fuel type features
-        def fuel_type_score(fuel):
-            fuel = str(fuel).upper()
-            if fuel == "X":
-                return pd.Series([5, 5])  # cost_score, availability_score
-            elif fuel == "Z":
-                return pd.Series([8, 6])  # Premium gasoline - higher cost
-            elif fuel == "D":
-                return pd.Series([3, 7])  # Diesel - lower cost
-            else:
-                return pd.Series([5, 5])  # Default
-
-        df[["fuel_cost_score", "fuel_availability_score"]] = \
-            df["FUEL"].apply(fuel_type_score)
-
-        # Calculated features
-        # Ensure numeric type first
-        df["COMB (L/100 km)"] = pd.to_numeric(df["COMB (L/100 km)"], errors='coerce')
-        df["EMISSIONS"] = pd.to_numeric(df["EMISSIONS"], errors='coerce')
-
+        # Calculated features (same as training)
         df["fuel_efficiency_score"] = 100 / (df["COMB (L/100 km)"] + 1)
         df["emission_score"] = 100 / (df["EMISSIONS"] + 1)
-        df["power_to_size_ratio"] = df["CYLINDERS"] / (df["ENGINE SIZE"] + 0.1)
-        df["estimated_price_category"] = (
-            (df["YEAR"] - 2000) * 0.2 +
-            df["CYLINDERS"] * 0.8 +
-            df["ENGINE SIZE"] * 1.5 +
-            df["brand_performance_bias"] * 0.5
-        ).clip(0, 10)
+        df["power_to_size_ratio"] = df["HORSEPOWER"] / (df["ENGINE SIZE"] + 0.1)
+
+        # Estimated price category
+        if 'MAINTENANCE COST' in df.columns:
+            df["estimated_price_category"] = (
+                    (df["MAINTENANCE COST"] / 100000) * 3 +
+                    (df["HORSEPOWER"] / 100) * 2 +
+                    df["brand_performance_bias"] * 0.5 +
+                    df["engine_power_score"] * 0.3
+            ).clip(0, 10)
+        else:
+            df["estimated_price_category"] = (
+                    (df["YEAR"] - 2000) * 0.2 +
+                    df["CYLINDERS"] * 0.8 +
+                    df["ENGINE SIZE"] * 1.5 +
+                    df["brand_performance_bias"] * 0.5
+            ).clip(0, 10)
 
         # Encode categorical
-        for col in ["MAKE", "MODEL", "VEHICLE CLASS", "Engine Type", "TRANSMISSION", "FUEL"]:
+        for col in ["Make", "Model", "VEHICLE CLASS", "ENGINE TYPE", "Transmission"]:
             if col in df.columns and col in self.label_encoders:
                 le = self.label_encoders[col]
                 df[col] = df[col].astype(str).apply(
@@ -166,6 +178,7 @@ class VehicleRecommender:
         top_n : int
             Number of recommendations to return
         """
+
 
         if self.vehicle_data is None:
             raise ValueError("Please load vehicle inventory first using load_vehicle_inventory()")
@@ -197,39 +210,62 @@ class VehicleRecommender:
         return result_df
 
     def _apply_filters(self, user_profile: Dict) -> pd.DataFrame:
-        """Apply basic filters based on user profile"""
+        """Apply basic filters based on user profile using actual Price Categories"""
         original = self.original_data.copy()
 
-        # Salary-based price filtering (using year as proxy for price)
-        salary_map = {
-            'low': (2000, 2015),
-            'medium': (2010, 2020),
-            'high': (2015, 2024),
-            'luxury': (2018, 2024)
-        }
+        # 1. Salary-based price filtering (Using estimated_price_category instead of YEAR)
         salary = user_profile.get('salary_level', 'medium')
-        if salary in salary_map:
-            year_min, year_max = salary_map[salary]
-            original = original[original['YEAR'].between(year_min, year_max)]
 
-        # Year filter (override salary-based year if specified)
+        # 0 to 10 scale based on maintenance, HP, brand, etc.
+        price_map = {
+            'low': (0.0, 4.0),  # Budget friendly cars
+            'medium': (2.5, 6.5),  # Mid-range cars
+            'high': (5.0, 8.5),  # Expensive cars
+            'luxury': (7.5, 10.0)  # Premium/Luxury cars
+        }
+
+        if salary in price_map and 'estimated_price_category' in self.vehicle_data.columns:
+            min_price, max_price = price_map[salary]
+
+            # Find indices of vehicles that fit the user's budget
+            valid_indices = self.vehicle_data[
+                self.vehicle_data['estimated_price_category'].between(min_price, max_price)
+            ].index
+
+            mask = original.index.isin(valid_indices)
+            if mask.sum() > 0:
+                original = original[mask]
+            else:
+                print(f"⚠️ No vehicles strictly found for '{salary}' budget, relaxing filter...")
+
+        # 2. Year filter (override if specific year is given)
         if 'year_min' in user_profile:
             year_min = user_profile['year_min']
-            original = original[original['YEAR'] >= year_min]
+            mask = original['YEAR'] >= year_min
+            if mask.sum() > 0:
+                original = original[mask]
 
-        # Fuel consumption filter
+        # 3. Fuel consumption filter
         if 'max_fuel_consumption' in user_profile:
             max_fuel = user_profile['max_fuel_consumption']
-            original = original[original['COMB (L/100 km)'] <= max_fuel]
+            mask = original['COMB (L/100 km)'] <= max_fuel
+            if mask.sum() > 0:
+                original = original[mask]
 
-        # Vehicle class preferences based on primary need
+        # 4. Vehicle class preferences based on primary need
         need = user_profile.get('primary_need', 'economy')
         if need == 'family':
-            # Prefer larger vehicles
-            preferred_classes = ['MID-SIZE', 'SUV - SMALL', 'SUV - STANDARD', 'MINIVAN']
+            preferred_classes = ['MID-SIZE', 'SUV - SMALL', 'SUV - STANDARD', 'MINIVAN',
+                                 'SUV', 'CROSSOVER', 'STATION WAGON', 'FULL-SIZE',
+                                 'COMPACT', 'SUBCOMPACT']
             mask = original['VEHICLE CLASS'].str.upper().isin(preferred_classes)
             if mask.sum() > 0:
                 original = original[mask]
+
+        # Fallback: if all filters removed everything, return full dataset
+        if original.empty:
+            print("⚠️ No vehicles matched filters, relaxing all constraints...")
+            return self.vehicle_data.copy()
 
         # Return corresponding encoded data
         return self.vehicle_data.loc[original.index]
@@ -293,10 +329,10 @@ class VehicleRecommender:
         original['Need_Match'] = df['need_score'].round(1)
         original['Usage_Match'] = df['usage_score'].round(1)
 
-        # Reorder columns for display
+        # Reorder columns for display (use renamed column names)
         display_cols = [
-            'YEAR', 'MAKE', 'MODEL', 'VEHICLE CLASS',
-            'ENGINE SIZE', 'CYLINDERS', 'TRANSMISSION', 'FUEL',
+            'YEAR', 'Make', 'Model', 'VEHICLE CLASS',
+            'ENGINE SIZE', 'CYLINDERS', 'Transmission', 'FUEL',
             'COMB (L/100 km)', 'COMB (mpg)', 'EMISSIONS',
             'Compatibility_Score', 'Need_Match', 'Usage_Match'
         ]
@@ -305,30 +341,6 @@ class VehicleRecommender:
         result.index = result.index + 1  # Start from 1
 
         return result
-
-    def save_models(self, directory=None):
-        """Save trained models to disk"""
-        if directory is None:
-            directory = self.models_dir
-
-        os.makedirs(directory, exist_ok=True)
-
-        joblib.dump(self.scaler, os.path.join(directory, "scaler.pkl"))
-        joblib.dump(self.knn_model, os.path.join(directory, "knn_model.pkl"))
-        joblib.dump(self.feature_matrix, os.path.join(directory, "feature_matrix.pkl"))
-        joblib.dump(self.label_encoders, os.path.join(directory, "label_encoders.pkl"))
-        print(f"✅ Models saved to {directory}/")
-
-    def load_models(self, directory=None):
-        """Load pre-trained models from disk"""
-        if directory is None:
-            directory = self.models_dir
-
-        self.scaler = joblib.load(os.path.join(directory, "scaler.pkl"))
-        self.knn_model = joblib.load(os.path.join(directory, "knn_model.pkl"))
-        self.feature_matrix = joblib.load(os.path.join(directory, "feature_matrix.pkl"))
-        self.label_encoders = joblib.load(os.path.join(directory, "label_encoders.pkl"))
-        print(f"✅ Models loaded from {directory}/")
 
 
 def main():
@@ -350,7 +362,7 @@ def main():
         'year_min': 2015,
         'max_fuel_consumption': 7
     }
-    recommendations1 = recommender.get_recommendations(user1, top_n=5)
+    recommendations1 = recommender.get_recommendations(user1, top_n=10)
     print("\n🏆 TOP 5 RECOMMENDATIONS:\n")
     print(recommendations1.to_string())
     print()
@@ -365,7 +377,7 @@ def main():
         'usage': 'highway',
         'year_min': 2018
     }
-    recommendations2 = recommender.get_recommendations(user2, top_n=5)
+    recommendations2 = recommender.get_recommendations(user2, top_n=10)
     print("\n🏆 TOP 5 RECOMMENDATIONS:\n")
     print(recommendations2.to_string())
     print()
@@ -381,7 +393,7 @@ def main():
         'year_min': 2016,
         'max_fuel_consumption': 10
     }
-    recommendations3 = recommender.get_recommendations(user3, top_n=5)
+    recommendations3 = recommender.get_recommendations(user3, top_n=10)
     print("\n🏆 TOP 5 RECOMMENDATIONS:\n")
     print(recommendations3.to_string())
     print()

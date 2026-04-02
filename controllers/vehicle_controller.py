@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
-from sqlalchemy import delete as sa_delete
 
 from models.vehicle import Vehicle
 from models.vehicle_class import VehicleClass
@@ -17,7 +16,15 @@ from models.oil import OilQuality
 from models.brand import Brand
 
 
-async def get_all_vehicles(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Vehicle]:
+def validate_price_range(minimum_price: Optional[Decimal], max_price: Optional[Decimal]) -> None:
+    if minimum_price is not None and max_price is not None and minimum_price > max_price:
+        raise HTTPException(
+            status_code=400,
+            detail="Minimum price cannot be greater than maximum price",
+        )
+
+
+async def get_all_vehicles(db: AsyncSession, skip: int = 0, limit: int = 500) -> List[Vehicle]:
     stmt = (
         select(Vehicle)
         .options(
@@ -32,7 +39,7 @@ async def get_all_vehicles(db: AsyncSession, skip: int = 0, limit: int = 100) ->
         .limit(limit)
     )
     result = await db.execute(stmt)
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 async def get_vehicles_by_model(db: AsyncSession, model_name: str) -> List[Vehicle]:
@@ -49,7 +56,7 @@ async def get_vehicles_by_model(db: AsyncSession, model_name: str) -> List[Vehic
         .filter(Vehicle.model_name == model_name)
     )
     result = await db.execute(stmt)
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 async def create_vehicle(
@@ -64,6 +71,8 @@ async def create_vehicle(
     manufacturing_year: int,
     tyre_size: Optional[str] = None,
     engine_size: Optional[Decimal] = None,
+    minimum_price: Optional[Decimal] = None,
+    max_price: Optional[Decimal] = None,
     fuel_efficiency_highway: Optional[Decimal] = None,
     fuel_efficiency_combined: Optional[Decimal] = None,
     description: Optional[str] = None
@@ -94,6 +103,8 @@ async def create_vehicle(
         if not brand.scalar_one_or_none():
             raise HTTPException(status_code=404, detail=f"Brand with ID {brand_id} does not exist")
 
+    validate_price_range(minimum_price, max_price)
+
     new_vehicle = Vehicle(
         model_name=model_name,
         brand_id=brand_id,
@@ -103,6 +114,8 @@ async def create_vehicle(
         transmission_id=transmission_id,
         oil_id=oil_id,
         engine_size=engine_size,
+        minimum_price=minimum_price,
+        max_price=max_price,
         manufacturing_year=manufacturing_year,
         tyre_size=tyre_size,
         fuel_efficiency_highway=fuel_efficiency_highway,
@@ -142,6 +155,8 @@ async def update_vehicle(
     manufacturing_year: Optional[int] = None,
     tyre_size: Optional[str] = None,
     engine_size: Optional[Decimal] = None,
+    minimum_price: Optional[Decimal] = None,
+    max_price: Optional[Decimal] = None,
     fuel_efficiency_highway: Optional[Decimal] = None,
     fuel_efficiency_combined: Optional[Decimal] = None,
     description: Optional[str] = None
@@ -155,6 +170,10 @@ async def update_vehicle(
         brand = await db.execute(select(Brand).filter(Brand.brand_id == brand_id))
         if not brand.scalar_one_or_none():
             raise HTTPException(status_code=404, detail=f"Brand with ID {brand_id} does not exist")
+
+    effective_minimum_price = minimum_price if minimum_price is not None else vehicle.minimum_price
+    effective_max_price = max_price if max_price is not None else vehicle.max_price
+    validate_price_range(effective_minimum_price, effective_max_price)
 
     if model_name is not None:
         vehicle.model_name = model_name
@@ -172,6 +191,10 @@ async def update_vehicle(
         vehicle.oil_id = oil_id
     if engine_size is not None:
         vehicle.engine_size = engine_size
+    if minimum_price is not None:
+        vehicle.minimum_price = minimum_price
+    if max_price is not None:
+        vehicle.max_price = max_price
     if manufacturing_year is not None:
         vehicle.manufacturing_year = manufacturing_year
     if tyre_size is not None:
@@ -189,7 +212,11 @@ async def update_vehicle(
 
 
 async def delete_vehicle(db: AsyncSession, vehicle_id: int) -> bool:
-    stmt = sa_delete(Vehicle).where(Vehicle.vehicle_id == vehicle_id)
-    result = await db.execute(stmt)
+    result = await db.execute(select(Vehicle).filter(Vehicle.vehicle_id == vehicle_id))
+    vehicle = result.scalar_one_or_none()
+    if not vehicle:
+        return False
+
+    await db.delete(vehicle)
     await db.commit()
-    return (result.rowcount or 0) > 0
+    return True

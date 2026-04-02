@@ -81,7 +81,7 @@ celerybeat-schedule
 *.pkl
 vehicle_feature_columns.pkl
 vehicle_label_encoders.pkl
-vehicle_ranking_models.pkl
+ml/vehicle_ranking_models.pkl
 *.pickle
 data/*.pkl
 data/models/*.pkl

@@ -8,8 +8,15 @@ SalaryLevel = Literal["low", "medium", "high", "luxury"]
 
 
 class RecommendRequest(BaseModel):
-    # Income inputs
-    monthly_income: Optional[float] = Field(None, ge=0, description="Monthly income in LKR")
+    # Financial inputs (salary is required)
+    salary: float = Field(..., gt=0, description="Monthly salary in LKR (required)")
+    rate_of_interest: Optional[float] = Field(None, ge=0, description="Annual interest rate in percent. Defaults to 13.")
+    number_of_months: Optional[int] = Field(None, gt=0, description="Loan tenure in months. Defaults to 60.")
+    down_payment_amount: Optional[float] = Field(None, ge=0, description="Down payment in LKR (absolute amount). If provided, overrides down_payment_ratio.")
+    down_payment_ratio: Optional[float] = Field(None, ge=0, le=1, description="Down payment as ratio of vehicle price. Defaults to 0.5 (50%). Used only if down_payment_amount is not provided.")
+
+    # Backward compatibility
+    monthly_income: Optional[float] = Field(None, ge=0, description="Deprecated: use salary")
     salary_level: Optional[SalaryLevel] = Field(
         None, description="Optional override: low|medium|high|luxury"
     )
@@ -32,4 +39,5 @@ class RecommendRequest(BaseModel):
 class RecommendResponse(BaseModel):
     message: Optional[str] = None
     count: int = 0
-    items: List[Dict[str, Any]] = []
+    items: List[Dict[str, Any]] = Field(default_factory=list)
+    finance: Dict[str, Any] = Field(default_factory=dict)

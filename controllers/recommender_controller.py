@@ -169,6 +169,15 @@ class RecommendationController:
             monthly_emi = calculate_emi(loan_principal, rate_of_interest, number_of_months)
             item["monthly_emi"] = monthly_emi
 
+            # Fuel cost estimate requested by the UI:
+            # fuel_price * combined fuel efficiency * 100
+            fuel_price = _to_float(item.get("fuel_price"))
+            combined_fuel_efficiency = _to_float(item.get("COMB (L/100 km)"))
+            if fuel_price is not None and combined_fuel_efficiency is not None:
+                item["fuel_cost"] = fuel_price * combined_fuel_efficiency * 100.0
+            else:
+                item["fuel_cost"] = None
+
             # Total repayable amount over the full tenure, including interest
             total_payable_amount = monthly_emi * number_of_months
             total_interest_amount = total_payable_amount - loan_principal

@@ -23,6 +23,7 @@ class Vehicle(Base):
     # Attributes
     tyre_size = Column(String)
     engine_size = Column(DECIMAL(4, 1))
+    image_url = Column(String(500),nullable=True)
     minimum_price = Column(DECIMAL(12, 2))
     max_price = Column(DECIMAL(12, 2))
     manufacturing_year = Column(Integer)

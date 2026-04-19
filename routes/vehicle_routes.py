@@ -33,6 +33,7 @@ async def create_vehicle_route(vehicle: VehicleCreate, db: AsyncSession = Depend
         vehicle.engine_size,
         vehicle.minimum_price,
         vehicle.max_price,
+        vehicle.image_url,
         vehicle.fuel_efficiency_highway,
         vehicle.fuel_efficiency_combined,
         vehicle.description
@@ -74,6 +75,7 @@ async def update_vehicle_route(vehicle_id: int, vehicle: VehicleUpdate, db: Asyn
         vehicle.engine_size,
         vehicle.minimum_price,
         vehicle.max_price,
+        vehicle.image_url,
         vehicle.fuel_efficiency_highway,
         vehicle.fuel_efficiency_combined,
         vehicle.description

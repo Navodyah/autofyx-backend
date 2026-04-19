@@ -1,8 +1,12 @@
+from decimal import Decimal
+from typing import Optional
+
 from pydantic import BaseModel
 
 
 class FuelTypeBase(BaseModel):
     fuel_type_name: str
+    fuel_price: Optional[Decimal] = None
 
 
 # Do not require fuel_type_id when creating; DB will generate it
@@ -16,10 +20,8 @@ class FuelTypeUpdate(FuelTypeBase):
 
 class FuelTypeResponse(FuelTypeBase):
     fuel_type_id: int
+    fuel_efficiency_combined: Optional[Decimal] = None
 
     class Config:
         from_attributes = True
-
-
-
 

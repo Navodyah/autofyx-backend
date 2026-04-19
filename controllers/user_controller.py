@@ -1,67 +1,77 @@
 from datetime import datetime, timezone
 from config.mongodb import get_database
 from models.user_models import User, UserLogin
-from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
-from utils.jwt_handler import create_access_token
-
-
-pwd_hasher = PasswordHasher()
-
-
-def hash_password(password: str) -> str:
-    return pwd_hasher.hash(password)
+from services.appwrite_service import (
+    register_user_appwrite, 
+    login_user_appwrite,
+    get_user_profile,
+    update_user_profile,
+    logout_user_appwrite
+)
 
 
 def create_user_mongo(user: User):
-    db = get_database()
-    users_collection = db["users"]
+    """
+    Register a new user using Appwrite with MongoDB storage
+    
+    Args:
+        user: User object with registration details
+        
+    Returns:
+        Dictionary with registration response
+    """
+    return register_user_appwrite(user)
 
-    hashed_pw = hash_password(user.password)
-
-    user_doc = {
-        "username": user.username,
-        "email": user.email,
-        "hashed_password": hashed_pw,
-        "user_type": user.user_type if user.user_type else "user",
-        "created_at": datetime.now(timezone.utc)
-
-    }
-
-    result = users_collection.insert_one(user_doc)
-
-    return {
-        "msg": "User created successfully",
-        "user_id": str(result.inserted_id),
-        "user_type": user.user_type
-    }
 
 def login_user_mongo(credentials: UserLogin):
-    db = get_database()
-    users_collection = db["users"]
+    """
+    Login user using Appwrite authentication
+    
+    Args:
+        credentials: UserLogin object with email and password
+        
+    Returns:
+        Dictionary with login response and session data
+    """
+    return login_user_appwrite(credentials)
 
-    user_doc = users_collection.find_one({"email": credentials.email})
-    if not user_doc:
-        return {"msg": "User not found"}
 
-    try:
-        pwd_hasher.verify(user_doc["hashed_password"], credentials.password)
-    except VerifyMismatchError:
-        return {"msg": "Incorrect password"}
+def get_user_by_id(user_id: str):
+    """
+    Get user profile by ID
+    
+    Args:
+        user_id: MongoDB user ID
+        
+    Returns:
+        Dictionary with user profile
+    """
+    return get_user_profile(user_id)
 
-    # ✅ JWT token generate (sub = user_id)
-    token = create_access_token({
-        "sub": str(user_doc["_id"]),
-        "user_type": user_doc.get("user_type", "user"),
-        "email": user_doc["email"]
-    })
 
-    return {
-        "msg": "Login successful",
-        "access_token": token,          # ✅ add
-        "token_type": "bearer",         # ✅ add
-        "user_id": str(user_doc["_id"]),
-        "username": user_doc["username"],
-        "email": user_doc["email"],
-        "user_type": user_doc.get("user_type", "user")
-    }
+def update_user_by_id(user_id: str, update_data: dict):
+    """
+    Update user profile
+    
+    Args:
+        user_id: MongoDB user ID
+        update_data: Dictionary with fields to update
+        
+    Returns:
+        Dictionary with update response
+    """
+    return update_user_profile(user_id, update_data)
+
+
+def logout_user(session_id: str):
+    """
+    Logout user by deleting session
+    
+    Args:
+        session_id: Appwrite session ID
+        
+    Returns:
+        Dictionary with logout response
+    """
+    return logout_user_appwrite(session_id)
+

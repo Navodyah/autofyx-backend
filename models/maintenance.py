@@ -7,7 +7,7 @@ class MaintenanceCost(Base):
     __tablename__ = "maintenance_costs"
 
     record_id = Column(Integer, primary_key=True, index=True)
-    vehicle_id = Column(Integer, ForeignKey("vehicles.vehicle_id"))
+    vehicle_id = Column(Integer, ForeignKey("vehicles.vehicle_id", ondelete="CASCADE"))
 
     yearly_cost = Column(DECIMAL(10, 2))
     recorded_date = Column(Date)

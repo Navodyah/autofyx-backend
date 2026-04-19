@@ -23,6 +23,8 @@ class Vehicle(Base):
     # Attributes
     tyre_size = Column(String)
     engine_size = Column(DECIMAL(4, 1))
+    minimum_price = Column(DECIMAL(12, 2))
+    max_price = Column(DECIMAL(12, 2))
     manufacturing_year = Column(Integer)
     fuel_efficiency_highway = Column(DECIMAL(5, 2))
     fuel_efficiency_combined = Column(DECIMAL(5, 2))
@@ -37,4 +39,8 @@ class Vehicle(Base):
     transmission = relationship("Transmission", back_populates="vehicles")
     oil_quality = relationship("OilQuality", back_populates="vehicles")
 
-    maintenance_costs = relationship("MaintenanceCost", back_populates="vehicle")
+    maintenance_costs = relationship(
+        "MaintenanceCost",
+        back_populates="vehicle",
+        passive_deletes=True,
+    )

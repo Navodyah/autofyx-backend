@@ -216,6 +216,8 @@ def _build_candidate_query(
             b.brand_name AS \"Make\",
             v.model_name AS \"Model\",
             c.class_name AS \"VEHICLE CLASS\",
+            (v.minimum_price::float * 1000000) AS minimum_price,
+            (v.max_price::float * 1000000) AS max_price,
             v.engine_size::float AS \"ENGINE SIZE\",
             GREATEST(3, ROUND(COALESCE(v.engine_size::float, 1.0) * 2))::float AS \"CYLINDERS\",
             t.transmission_name AS \"Transmission\",
@@ -236,13 +238,28 @@ def _build_candidate_query(
             CASE
                 WHEN v.fuel_efficiency_combined IS NOT NULL THEN v.fuel_efficiency_combined::float * 23.0
                 ELSE NULL
-            END AS \"EMISSIONS\"
+            END AS \"EMISSIONS\",
+            mc.record_id AS maintenance_record_id,
+            mc.yearly_cost::float AS maintenance_yearly_cost,
+            mc.recorded_date AS maintenance_recorded_date,
+            mc.source AS maintenance_source
         FROM vehicles v
         JOIN brands b ON b.brand_id = v.brand_id
         LEFT JOIN vehicle_classes c ON c.class_id = v.class_id
         LEFT JOIN engine_types et ON et.engine_type_id = v.engine_type_id
         LEFT JOIN transmissions t ON t.transmission_id = v.transmission_id
         LEFT JOIN fuel_types f ON f.fuel_type_id = v.fuel_type_id
+        LEFT JOIN LATERAL (
+            SELECT
+                m.record_id,
+                m.yearly_cost,
+                m.recorded_date,
+                m.source
+            FROM maintenance_costs m
+            WHERE m.vehicle_id = v.vehicle_id
+            ORDER BY m.recorded_date DESC NULLS LAST, m.record_id DESC
+            LIMIT 1
+        ) mc ON TRUE
         WHERE v.manufacturing_year IS NOT NULL
         """
     ]
@@ -447,6 +464,8 @@ class DBPipelineRecommender:
             "Make",
             "Model",
             "VEHICLE CLASS",
+            "minimum_price",
+            "max_price",
             "ENGINE SIZE",
             "CYLINDERS",
             "Transmission",
@@ -454,6 +473,10 @@ class DBPipelineRecommender:
             "COMB (L/100 km)",
             "COMB (mpg)",
             "EMISSIONS",
+            "maintenance_record_id",
+            "maintenance_yearly_cost",
+            "maintenance_recorded_date",
+            "maintenance_source",
             "Compatibility_Score",
             "Need_Match",
             "Usage_Match",

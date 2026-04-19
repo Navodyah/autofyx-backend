@@ -17,7 +17,7 @@ router = APIRouter(prefix="/fuel_types", tags=["fuel-types"])
 @router.post("/", response_model=FuelTypeResponse, status_code=201)
 async def create_fuel_type_route(fuel_type: FuelTypeCreate, db: AsyncSession = Depends(get_db)):
     """Create a new fuel type"""
-    return await create_fuel_type(db, fuel_type.fuel_type_name)
+    return await create_fuel_type(db, fuel_type.fuel_type_name, fuel_type.fuel_price)
 
 
 @router.get("/{fuel_type_id}", response_model=FuelTypeResponse)
@@ -35,7 +35,12 @@ async def get_all_fuel_types_route(skip: int = 0, limit: int = 100, db: AsyncSes
 
 @router.put("/{fuel_type_id}", response_model=FuelTypeResponse)
 async def update_fuel_type_route(fuel_type_id: int, fuel_type: FuelTypeUpdate, db: AsyncSession = Depends(get_db)):
-    updated_fuel_type = await update_fuel_type(db, fuel_type_id, fuel_type.fuel_type_name)
+    updated_fuel_type = await update_fuel_type(
+        db,
+        fuel_type_id,
+        fuel_type.fuel_type_name,
+        fuel_type.fuel_price,
+    )
     if not updated_fuel_type:
         raise HTTPException(status_code=404, detail="Fuel type not found")
     return updated_fuel_type

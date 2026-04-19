@@ -17,7 +17,7 @@ from typing import List
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
-@router.post("/", response_model=VehicleResponse, status_code=201)
+@router.post("/", response_model=VehicleResponse, response_model_by_alias=False, status_code=201)
 async def create_vehicle_route(vehicle: VehicleCreate, db: AsyncSession = Depends(get_db)):
     return await create_vehicle(
         db,
@@ -31,13 +31,15 @@ async def create_vehicle_route(vehicle: VehicleCreate, db: AsyncSession = Depend
         vehicle.manufacturing_year,
         vehicle.tyre_size,
         vehicle.engine_size,
+        vehicle.minimum_price,
+        vehicle.max_price,
         vehicle.fuel_efficiency_highway,
         vehicle.fuel_efficiency_combined,
         vehicle.description
     )
 
 
-@router.get("/{vehicle_id}", response_model=VehicleResponse)
+@router.get("/{vehicle_id}", response_model=VehicleResponse, response_model_by_alias=False)
 async def get_vehicle_route(vehicle_id: int, db: AsyncSession = Depends(get_db)):
     vehicle = await get_vehicle_by_id(db, vehicle_id)
     if not vehicle:
@@ -45,17 +47,17 @@ async def get_vehicle_route(vehicle_id: int, db: AsyncSession = Depends(get_db))
     return vehicle
 
 
-@router.get("/", response_model=List[VehicleResponse])
-async def get_all_vehicles_route(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
+@router.get("/", response_model=List[VehicleResponse], response_model_by_alias=False)
+async def get_all_vehicles_route(skip: int = 0, limit: int = 500, db: AsyncSession = Depends(get_db)):
     return await get_all_vehicles(db, skip, limit)
 
 
-@router.get("/model/{model_name}", response_model=List[VehicleResponse])
+@router.get("/model/{model_name}", response_model=List[VehicleResponse], response_model_by_alias=False)
 async def get_vehicles_by_model_route(model_name: str, db: AsyncSession = Depends(get_db)):
     return await get_vehicles_by_model(db, model_name)
 
 
-@router.put("/{vehicle_id}", response_model=VehicleResponse)
+@router.put("/{vehicle_id}", response_model=VehicleResponse, response_model_by_alias=False)
 async def update_vehicle_route(vehicle_id: int, vehicle: VehicleUpdate, db: AsyncSession = Depends(get_db)):
     updated_vehicle = await update_vehicle(
         db,
@@ -70,6 +72,8 @@ async def update_vehicle_route(vehicle_id: int, vehicle: VehicleUpdate, db: Asyn
         vehicle.manufacturing_year,
         vehicle.tyre_size,
         vehicle.engine_size,
+        vehicle.minimum_price,
+        vehicle.max_price,
         vehicle.fuel_efficiency_highway,
         vehicle.fuel_efficiency_combined,
         vehicle.description

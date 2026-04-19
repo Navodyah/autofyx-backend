@@ -212,6 +212,7 @@ def _build_candidate_query(
         """
         SELECT
             v.vehicle_id AS vehicle_id,
+            v.fuel_type_id AS fuel_type_id,
             v.manufacturing_year AS \"YEAR\",
             b.brand_name AS \"Make\",
             v.model_name AS \"Model\",
@@ -222,6 +223,7 @@ def _build_candidate_query(
             GREATEST(3, ROUND(COALESCE(v.engine_size::float, 1.0) * 2))::float AS \"CYLINDERS\",
             t.transmission_name AS \"Transmission\",
             f.fuel_type_name AS \"FUEL\",
+            f.fuel_price::float AS fuel_price,
             et.engine_type_name AS \"ENGINE TYPE\",
             CASE
                 WHEN v.fuel_efficiency_combined IS NOT NULL THEN v.fuel_efficiency_combined::float
@@ -460,6 +462,7 @@ class DBPipelineRecommender:
 
         display_columns = [
             "vehicle_id",
+            "fuel_type_id",
             "YEAR",
             "Make",
             "Model",
@@ -470,6 +473,7 @@ class DBPipelineRecommender:
             "CYLINDERS",
             "Transmission",
             "FUEL",
+            "fuel_price",
             "COMB (L/100 km)",
             "COMB (mpg)",
             "EMISSIONS",

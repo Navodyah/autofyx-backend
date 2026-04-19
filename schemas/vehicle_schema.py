@@ -1,6 +1,6 @@
 # python
 # File: `schemas/vehicle_schema.py`
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, ConfigDict, root_validator
 from typing import Optional
 from decimal import Decimal
 from datetime import datetime
@@ -22,6 +22,7 @@ class VehicleBase(BaseModel):
     fuel_efficiency_highway: Optional[Decimal] = Field(None, ge=0)
     fuel_efficiency_combined: Optional[Decimal] = Field(None, ge=0)
     description: Optional[str] = None
+    image_url: Optional[str] = None
 
     @root_validator(pre=True)
     def populate_model_name(cls, values):
@@ -29,16 +30,12 @@ class VehicleBase(BaseModel):
             values["model_name"] = values["vehicle_model"]
         return values
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(validate_by_name=True)
 
 
 class VehicleCreate(VehicleBase):
     model_name: str
     manufacturing_year: int
-
-    class Config:
-        allow_population_by_field_name = True
 
 
 class VehicleUpdate(BaseModel):
@@ -57,6 +54,7 @@ class VehicleUpdate(BaseModel):
     fuel_efficiency_highway: Optional[Decimal] = Field(None, ge=0)
     fuel_efficiency_combined: Optional[Decimal] = Field(None, ge=0)
     description: Optional[str] = None
+    image_url: Optional[str] = None
 
     @root_validator(pre=True)
     def populate_model_name(cls, values):
@@ -64,14 +62,11 @@ class VehicleUpdate(BaseModel):
             values["model_name"] = values["vehicle_model"]
         return values
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(validate_by_name=True)
 
 
 class VehicleResponse(VehicleBase):
     vehicle_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-        allow_population_by_field_name = True
+    model_config = ConfigDict(from_attributes=True, validate_by_name=True)

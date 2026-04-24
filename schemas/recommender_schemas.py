@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field
 
 
-SalaryLevel = Literal["low", "medium", "high", "luxury"]
+SalaryLevel = Literal["low", "medium_low", "medium", "high", "luxury"]
 
 
 class RecommendRequest(BaseModel):
@@ -29,7 +29,20 @@ class RecommendRequest(BaseModel):
     fuel: Optional[str] = Field(None, description="Example: 'D - Diesel' / 'X - Regular Gasoline' / 'Z - Premium Gasoline'")
     transmission: Optional[str] = Field(None, description="Example: 'A=Automatic' / 'Manual' / 'Any' / 'A6'")
     max_comb_l_per_100: Optional[float] = Field(None, gt=0, description="Max combined fuel consumption (L/100km)")
-    vehicle_class: Optional[str] = Field(None, description="Exact class name (e.g., COMPACT)")
+    vehicle_class: Optional[str] = Field(None, description="Single class override (e.g. COMPACT). Use vehicle_classes for multi-class frontend filtering.")
+    vehicle_classes: Optional[List[str]] = Field(
+        None,
+        description="Pre-computed final class list from frontend (salary ∩ purpose × area). When provided, used directly as the DB class filter — skips all internal mapper logic."
+    )
+
+    # Sri Lanka market: maintainability preference
+    # 'high'    → strongly prioritise low-maintenance vehicles (Japanese/Korean Kei to compact)
+    # 'average' → moderate background weight (default when not provided)
+    # 'none'    → no maintainability bias (high-income user-driven)
+    maintainability_priority: Optional[Literal["high", "average", "none"]] = Field(
+        None,
+        description="Maintainability preference: 'high' (Japanese/Korean compact), 'average' (default), 'none' (no bias)"
+    )
 
     # Output controls
     top_n: int = Field(10, ge=1, le=50)

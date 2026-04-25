@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import joblib
 import pandas as pd
@@ -11,6 +11,7 @@ from psycopg2.extras import RealDictCursor
 from config.postgresql import get_postgres_connection
 from services.salary_category_mapper import (
     expand_categories_for_db_filter,
+    get_purpose_area_categories,
     resolve_salary_vehicle_categories,
 )
 
@@ -30,7 +31,74 @@ TARGET_COLUMNS = (
     "city_score",
     "highway_score",
     "offroad_score",
+    "maintainability_score",   # ← Sri Lanka income-aware target (added via train_lk_recommender.py)
 )
+
+# ── Sri Lanka brand origin tables (used for post-ranking boost) ───────────────
+_LK_JAPANESE_BRANDS = {
+    "TOYOTA", "HONDA", "NISSAN", "MAZDA", "MITSUBISHI",
+    "SUBARU", "SUZUKI", "DAIHATSU", "ISUZU",
+}
+_LK_KOREAN_BRANDS = {"KIA", "HYUNDAI"}
+
+
+def _get_brand_origin(make: str) -> str:
+    m = str(make).strip().upper()
+    if m in _LK_JAPANESE_BRANDS:
+        return "japanese"
+    if m in _LK_KOREAN_BRANDS:
+        return "korean"
+    return "other"
+
+
+# ── Sri Lanka income-tier base scoring weights ─────────────────────────────────
+# These blend with the user's purpose/area weights to surface income-appropriate
+# vehicles even when the user doesn't explicitly state preferences.
+#
+# Income tiers (aligned with salary_category_mapper.py 4-tier split):
+#   low       : < 100k     Kei / Minicompact / Subcompact (Wagon R, Alto, Vitz)
+#   medium_low: 100k-249k  Subcompact / Compact / Wagon  (Axio, Fielder, Demio)
+#   medium_default: 250k-600k  Compact → Mid-size → MPV / SUV-Small (Camry, Voxy)
+#   high / luxury: >600k   User-driven, average maintenance as background weight
+_LK_TIER_WEIGHTS: Dict[str, Dict[str, float]] = {
+    # Low income: easy-to-maintain, fuel-efficient Kei/Subcompact Japanese cars
+    "low": {
+        "maintainability_score": 0.40,
+        "economy_score":         0.35,
+        "city_score":            0.15,
+        "family_score":          0.10,
+    },
+    # Medium-low: economy compact/subcompact path
+    "medium_low": {
+        "maintainability_score": 0.25,
+        "economy_score":         0.30,
+        "city_score":            0.25,
+        "family_score":          0.20,
+    },
+    # Medium income + user explicitly wants maintainability
+    "medium_maintain": {
+        "maintainability_score": 0.30,
+        "economy_score":         0.25,
+        "city_score":            0.20,
+        "family_score":          0.15,
+        "highway_score":         0.10,
+    },
+    # Medium income, no explicit preference → average maintainability, mid-size zone
+    "medium_default": {
+        "economy_score":         0.25,
+        "family_score":          0.28,
+        "city_score":            0.22,
+        "highway_score":         0.15,
+        "maintainability_score": 0.10,
+    },
+    # High / luxury income: user requirements dominate, small background maintenance weight
+    "high": {
+        "maintainability_score": 0.08,
+    },
+    "luxury": {
+        "maintainability_score": 0.05,
+    },
+}
 
 
 @lru_cache(maxsize=1)
@@ -97,7 +165,23 @@ def _primary_need_weights(primary_need: str) -> Dict[str, float]:
     }
 
 
-def _build_target_weights(primary_need: str, area: str) -> Dict[str, float]:
+def _build_target_weights(
+    primary_need: str,
+    area: str,
+    salary_level: Optional[str] = None,
+    maintainability_priority: Optional[str] = None,
+) -> Dict[str, float]:
+    """
+    Build final scoring weights by blending:
+      65% primary_need weights (user purpose)
+    + 35% usage_area weights  (city/highway/off-road)
+    + Sri Lanka income-tier overlay (maintainability_score emphasis)
+
+    maintainability_priority: 'high' | 'average' | None
+      'high'    → stronger maintainability weight (user explicitly asked)
+      'average' → use tier default (no explicit request)
+      None      → same as 'average'
+    """
     weights = {col: 0.0 for col in TARGET_COLUMNS}
 
     for target, value in _primary_need_weights(primary_need).items():
@@ -106,11 +190,80 @@ def _build_target_weights(primary_need: str, area: str) -> Dict[str, float]:
     for target, value in _usage_area_weights(area).items():
         weights[target] += value * 0.35
 
+    # ── Sri Lanka income-tier overlay ────────────────────────────────────────
+    tier_key = _resolve_lk_tier_key(
+        salary_level=salary_level,
+        maintainability_priority=maintainability_priority,
+    )
+    if tier_key and tier_key in _LK_TIER_WEIGHTS:
+        tier_w = _LK_TIER_WEIGHTS[tier_key]
+        # Blend: 60% user need/area, 40% LK tier signal
+        for target, tw in tier_w.items():
+            weights[target] = weights.get(target, 0.0) * 0.60 + tw * 0.40
+
     total = sum(weights.values())
     if total <= 0:
         return {"family_score": 0.5, "economy_score": 0.5}
 
     return {target: value / total for target, value in weights.items() if value > 0}
+
+
+def _resolve_lk_tier_key(
+    salary_level: Optional[str],
+    maintainability_priority: Optional[str],
+) -> Optional[str]:
+    """Map salary level + maintainability preference to an _LK_TIER_WEIGHTS key."""
+    level = str(salary_level or "").strip().lower()
+    maintain = str(maintainability_priority or "").strip().lower()
+
+    if level == "low":
+        return "low"
+    if level == "medium_low":
+        # 100k-249k: economy compact path, but always some maintainability push
+        return "medium_maintain" if maintain == "high" else "medium_low"
+    if level == "medium":
+        # Legacy 'medium' label: use maintain preference to pick path
+        return "medium_maintain" if maintain == "high" else "medium_default"
+    if level in ("high", "luxury"):
+        return level
+    return None
+
+
+def _apply_lk_brand_boost(
+    items: List[Dict[str, Any]],
+    salary_level: Optional[str],
+    boost_japanese: float = 1.08,
+    boost_korean: float = 1.04,
+) -> List[Dict[str, Any]]:
+    """
+    For low and medium income tiers, boost Japanese and Korean brand vehicles
+    in Compatibility_Score to reflect their superiority in Sri Lankan market
+    (parts availability, lower servicing cost, proven reliability).
+    High/luxury income: no brand bias — user requirements lead.
+    """
+    level = str(salary_level or "").strip().lower()
+    if level not in ("low", "medium"):
+        return items
+
+    for item in items:
+        origin = _get_brand_origin(str(item.get("Make", "")))
+        multiplier = 1.0
+        if origin == "japanese":
+            multiplier = boost_japanese
+        elif origin == "korean":
+            multiplier = boost_korean
+
+        if multiplier > 1.0:
+            item["Compatibility_Score"] = min(
+                100.0, float(item.get("Compatibility_Score", 0.0)) * multiplier
+            )
+            item["lk_brand_boosted"] = True
+            item["brand_origin"] = origin
+        else:
+            item["lk_brand_boosted"] = False
+            item["brand_origin"] = origin
+
+    return sorted(items, key=lambda x: x.get("Compatibility_Score", 0.0), reverse=True)
 
 
 def _normalize_token(value: str) -> str:
@@ -157,10 +310,44 @@ def _transmission_filter_terms(transmission_value: str) -> Dict[str, str]:
 
 
 def _build_db_filters(user_profile: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build DB WHERE-clause filters from user profile.
+
+    CLASS FILTER PRIORITY (highest → lowest):
+      1. vehicle_classes  — pre-computed list sent by frontend (salary ∩ purpose × area).
+                            Expanded through DB alias table and used directly.
+                            Bypasses ALL internal mapper logic.
+      2. vehicle_class    — single-class override (legacy / Postman use).
+                            Intersected with salary-based affordability classes.
+      3. Auto (internal)  — salary classes ∩ purpose × area classes computed
+                            server-side as the final fallback.
+    """
+    # ── PATH 1: Frontend pre-computed class list ─────────────────────────────
+    frontend_classes: List[str] = user_profile.get("vehicle_classes") or []
+    if frontend_classes:
+        # Expand each canonical class name to all DB alias variants
+        class_filters = sorted(set(expand_categories_for_db_filter(frontend_classes)))
+        return {
+            "class_filters": class_filters,
+            "max_comb": (
+                float(user_profile["max_fuel_consumption"])
+                if user_profile.get("max_fuel_consumption") is not None
+                else None
+            ),
+            "fuel": user_profile.get("fuel"),
+            "transmission": user_profile.get("transmission"),
+            "selected_categories": frontend_classes,
+            "purpose_area_categories": frontend_classes,
+            "auto_class_filters": class_filters,
+            "filter_source": "frontend",
+        }
+
+    # ── PATH 2 & 3: Server-side calculation (Postman / API-direct use) ───────
     monthly_income = user_profile.get("monthly_income")
-    salary_level = user_profile.get("salary_level")
+    salary_level   = user_profile.get("salary_level")
     explicit_vehicle_class = user_profile.get("vehicle_class")
 
+    # Salary-based affordability classes
     salary_categories = resolve_salary_vehicle_categories(
         monthly_income=_safe_float(monthly_income),
         salary_level=str(salary_level) if salary_level is not None else None,
@@ -170,27 +357,48 @@ def _build_db_filters(user_profile: Dict[str, Any]) -> Dict[str, Any]:
         expand_categories_for_db_filter(salary_categories) if salary_categories else []
     )
 
-    explicit_class_filters = []
+    # Purpose × Area suitability classes
+    primary_need = str(user_profile.get("primary_need", "economy")).strip().lower()
+    usage_area   = str(user_profile.get("usage", "mixed")).strip().lower()
+    purpose_area_cats = get_purpose_area_categories(primary_need, usage_area)
+    purpose_area_filters = (
+        expand_categories_for_db_filter(purpose_area_cats) if purpose_area_cats else []
+    )
+
+    # Intersect salary ∩ purpose+area; fall back to salary-only if empty
+    if salary_class_filters and purpose_area_filters:
+        auto_class_filters = sorted(
+            set(salary_class_filters).intersection(purpose_area_filters)
+        )
+        if not auto_class_filters:
+            auto_class_filters = salary_class_filters
+    elif salary_class_filters:
+        auto_class_filters = salary_class_filters
+    else:
+        auto_class_filters = purpose_area_filters
+
+    # Single-class explicit override (PATH 2)
     if explicit_vehicle_class:
         explicit_class_filters = expand_categories_for_db_filter([str(explicit_vehicle_class)])
-
-    # Salary affordability is the primary filter; explicit class narrows it further.
-    if salary_class_filters and explicit_class_filters:
-        class_filters = sorted(set(salary_class_filters).intersection(explicit_class_filters))
-    elif salary_class_filters:
-        class_filters = salary_class_filters
+        class_filters = sorted(set(auto_class_filters).intersection(explicit_class_filters))
+        if not class_filters:
+            class_filters = explicit_class_filters  # incompatible override – honour anyway
+        filter_source = "explicit_override"
     else:
-        class_filters = explicit_class_filters
+        class_filters = auto_class_filters
+        filter_source = "server_auto"
 
     max_comb = user_profile.get("max_fuel_consumption")
-    max_comb_numeric = float(max_comb) if max_comb is not None else None
 
     return {
         "class_filters": class_filters,
-        "max_comb": max_comb_numeric,
+        "max_comb": float(max_comb) if max_comb is not None else None,
         "fuel": user_profile.get("fuel"),
         "transmission": user_profile.get("transmission"),
         "selected_categories": salary_categories,
+        "purpose_area_categories": purpose_area_cats,
+        "auto_class_filters": auto_class_filters,
+        "filter_source": filter_source,
     }
 
 
@@ -212,7 +420,6 @@ def _build_candidate_query(
         """
         SELECT
             v.vehicle_id AS vehicle_id,
-            v.fuel_type_id AS fuel_type_id,
             v.manufacturing_year AS \"YEAR\",
             b.brand_name AS \"Make\",
             v.model_name AS \"Model\",
@@ -223,7 +430,6 @@ def _build_candidate_query(
             GREATEST(3, ROUND(COALESCE(v.engine_size::float, 1.0) * 2))::float AS \"CYLINDERS\",
             t.transmission_name AS \"Transmission\",
             f.fuel_type_name AS \"FUEL\",
-            f.fuel_price::float AS fuel_price,
             et.engine_type_name AS \"ENGINE TYPE\",
             CASE
                 WHEN v.fuel_efficiency_combined IS NOT NULL THEN v.fuel_efficiency_combined::float
@@ -427,12 +633,26 @@ class DBPipelineRecommender:
         weights = _build_target_weights(
             primary_need=str(user_profile.get("primary_need", "economy")),
             area=str(user_profile.get("usage", "mixed")),
+            salary_level=str(user_profile.get("salary_level", "")) or None,
+            maintainability_priority=str(user_profile.get("maintainability", "")) or None,
         )
 
         scored_df["raw_compatibility_score"] = 0.0
         for target, weight in weights.items():
             if target in scored_df.columns:
                 scored_df["raw_compatibility_score"] += scored_df[target] * float(weight)
+
+        # Apply price-bonus for economy and family (lower price = better score)
+        primary_need = str(user_profile.get("primary_need", "economy")).strip().lower()
+        if primary_need in ("economy", "family") and not scored_df.empty and "minimum_price" in scored_df.columns:
+            min_p = scored_df["minimum_price"].min()
+            max_p = scored_df["minimum_price"].max()
+            if max_p > min_p:
+                # Normalized: 1.0 for cheapest, 0.0 for most expensive in candidate pool
+                price_efficiency = 1.0 - ((scored_df["minimum_price"] - min_p) / (max_p - min_p))
+                # Add up to 15% bonus to the raw score
+                bonus_weight = 0.15
+                scored_df["raw_compatibility_score"] += (price_efficiency * bonus_weight)
 
         max_raw = _safe_float(scored_df["raw_compatibility_score"].max(), 0.0) or 0.0
         if max_raw > 0:
@@ -462,7 +682,6 @@ class DBPipelineRecommender:
 
         display_columns = [
             "vehicle_id",
-            "fuel_type_id",
             "YEAR",
             "Make",
             "Model",
@@ -473,7 +692,6 @@ class DBPipelineRecommender:
             "CYLINDERS",
             "Transmission",
             "FUEL",
-            "fuel_price",
             "COMB (L/100 km)",
             "COMB (mpg)",
             "EMISSIONS",
@@ -484,6 +702,7 @@ class DBPipelineRecommender:
             "Compatibility_Score",
             "Need_Match",
             "Usage_Match",
+            "maintainability_score",   # ← new LK target (present after retraining)
         ]
         available_display_columns = [c for c in display_columns if c in scored_df.columns]
 
@@ -493,4 +712,12 @@ class DBPipelineRecommender:
             .copy()
         )
 
-        return ranked[available_display_columns].reset_index(drop=True)
+        result_df = ranked[available_display_columns].reset_index(drop=True)
+
+        # ── Sri Lanka brand affinity boost (low / medium income only) ──────────
+        # Annotates each row with brand_origin and boosts Japanese/Korean
+        # Compatibility_Score so they surface at the top for budget buyers.
+        salary_level_val = str(user_profile.get("salary_level", "")).lower() or None
+        records = result_df.to_dict(orient="records")
+        boosted = _apply_lk_brand_boost(records, salary_level=salary_level_val)
+        return pd.DataFrame(boosted)

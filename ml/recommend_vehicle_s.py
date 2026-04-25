@@ -41,8 +41,8 @@ except ModuleNotFoundError:
         # Fallback keeps dataset shape stable when training helper module is absent.
         return df
 
-MODEL_PATH = "trained_vehicle_system/vehicle_ranking_models.pkl"
-METADATA_PATH = "trained_vehicle_system/vehicle_training_metadata.pkl"
+MODEL_PATH = "trained_vehicle_system/vehicle_ranking_models_past.pkl"
+METADATA_PATH = "trained_vehicle_system/vehicle_training_metadata_past.pkl"
 DATASET_PATH = "vehicledata.csv"
 
 TARGET_KEYWORDS = {

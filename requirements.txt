@@ -25,3 +25,6 @@ boto3
 botocore
 appwrite
 redis
+numpy
+pandas
+joblib

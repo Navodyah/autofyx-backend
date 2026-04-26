@@ -42,8 +42,8 @@ from sklearn.preprocessing import OneHotEncoder
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 DATASET_PATH   = "vehicledata.csv"
-MODELS_PATH    = SCRIPT_DIR / "vehicle_ranking_models.pkl"
-METADATA_PATH  = SCRIPT_DIR / "vehicle_training_metadata.pkl"
+MODELS_PATH    = "vehicle_ranking_models.pkl"
+METADATA_PATH  = "vehicle_training_metadata.pkl"
 
 # ── Sri Lanka brand tables ────────────────────────────────────────────────────
 

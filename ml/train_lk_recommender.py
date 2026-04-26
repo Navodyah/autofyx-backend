@@ -506,7 +506,7 @@ def train_and_patch():
         pass  # Non-critical
 
     # 6. Patch into existing pkl
-    print("\n[6/6] Patching vehicle_ranking_models_past.pkl …")
+    print("\n[6/6] Patching vehicle_ranking_models.pkl …")
     models = joblib.load(MODELS_PATH)
     models["maintainability_score"] = pipe
     joblib.dump(models, MODELS_PATH, compress=3)

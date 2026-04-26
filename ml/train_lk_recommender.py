@@ -41,7 +41,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-DATASET_PATH   = API_ROOT / "dataset" / "vehicledata.csv"
+DATASET_PATH   = "vehicledata.csv"
 MODELS_PATH    = SCRIPT_DIR / "vehicle_ranking_models_past.pkl"
 METADATA_PATH  = SCRIPT_DIR / "vehicle_training_metadata_past.pkl"
 

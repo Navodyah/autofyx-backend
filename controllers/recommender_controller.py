@@ -7,7 +7,7 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 
-# ── Ensure the project root (d:/Navo/api) is on sys.path so the pipeline
+# ── Ensure the project root is on sys.path so the pipeline
 #    module and its sub-imports (ml.recommend_vehicle_s, services, config)
 #    resolve correctly regardless of working directory. ──────────────────────
 _API_ROOT = Path(__file__).resolve().parent.parent  # controllers/ → api/

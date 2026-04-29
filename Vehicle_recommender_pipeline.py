@@ -419,38 +419,54 @@ def _build_candidate_query(
     query_parts = [
         """
         SELECT
-            v.vehicle_id AS vehicle_id,
-            v.manufacturing_year AS \"YEAR\",
-            b.brand_name AS \"Make\",
-            v.model_name AS \"Model\",
-            c.class_name AS \"VEHICLE CLASS\",
-            (v.minimum_price::float * 1000000) AS minimum_price,
-            (v.max_price::float * 1000000) AS max_price,
-            v.engine_size::float AS \"ENGINE SIZE\",
-            GREATEST(3, ROUND(COALESCE(v.engine_size::float, 1.0) * 2))::float AS \"CYLINDERS\",
-            t.transmission_name AS \"Transmission\",
-            f.fuel_type_name AS \"FUEL\",
-            et.engine_type_name AS \"ENGINE TYPE\",
+            v.vehicle_id                                    AS vehicle_id,
+            v.fuel_type_id                                  AS fuel_type_id,
+            v.image_url                                     AS image_url,
+            v.manufacturing_year                            AS \"YEAR\",
+            b.brand_name                                    AS \"Make\",
+            v.model_name                                    AS \"Model\",
+            c.class_name                                    AS \"VEHICLE CLASS\",
+            (v.minimum_price::float * 1000000)              AS minimum_price,
+            (v.max_price::float * 1000000)                  AS max_price,
+            v.engine_size::float                            AS \"ENGINE SIZE\",
+            GREATEST(3, ROUND(COALESCE(v.engine_size::float, 1.0) * 2))::float
+                                                            AS \"CYLINDERS\",
+            t.transmission_name                             AS \"Transmission\",
+            f.fuel_type_name                                AS \"FUEL\",
+            f.fuel_type_name                                AS fuel_type_name,
+            f.fuel_price::float                             AS fuel_price,
+            et.engine_type_name                             AS \"ENGINE TYPE\",
             CASE
-                WHEN v.fuel_efficiency_combined IS NOT NULL THEN v.fuel_efficiency_combined::float
-                WHEN v.fuel_efficiency_highway IS NOT NULL THEN (v.fuel_efficiency_highway::float * 1.15)
+                WHEN v.fuel_efficiency_combined IS NOT NULL
+                     THEN v.fuel_efficiency_combined::float
+                WHEN v.fuel_efficiency_highway IS NOT NULL
+                     THEN (v.fuel_efficiency_highway::float * 1.15)
                 ELSE NULL
-            END AS \"CITY (L/100 km)\",
-            v.fuel_efficiency_highway::float AS \"HWY (L/100 km)\",
-            v.fuel_efficiency_combined::float AS \"COMB (L/100 km)\",
+            END                                             AS \"CITY (L/100 km)\",
+            v.fuel_efficiency_highway::float                AS \"HWY (L/100 km)\",
+            v.fuel_efficiency_combined::float               AS \"COMB (L/100 km)\",
+            v.fuel_efficiency_combined::float               AS fuel_efficiency_combined,
             CASE
-                WHEN v.fuel_efficiency_combined IS NOT NULL AND v.fuel_efficiency_combined > 0
-                    THEN 235.215 / v.fuel_efficiency_combined::float
+                WHEN v.fuel_efficiency_combined IS NOT NULL
+                     AND v.fuel_efficiency_combined > 0
+                     THEN 235.215 / v.fuel_efficiency_combined::float
                 ELSE NULL
-            END AS \"COMB (mpg)\",
+            END                                             AS \"COMB (mpg)\",
             CASE
-                WHEN v.fuel_efficiency_combined IS NOT NULL THEN v.fuel_efficiency_combined::float * 23.0
+                WHEN v.fuel_efficiency_combined IS NOT NULL
+                     THEN v.fuel_efficiency_combined::float * 23.0
                 ELSE NULL
-            END AS \"EMISSIONS\",
-            mc.record_id AS maintenance_record_id,
-            mc.yearly_cost::float AS maintenance_yearly_cost,
-            mc.recorded_date AS maintenance_recorded_date,
-            mc.source AS maintenance_source
+            END                                             AS \"EMISSIONS\",
+            -- Maintenance: average yearly cost across all records for this vehicle
+            mc_agg.maintenance_count                        AS maintenance_record_count,
+            mc_agg.avg_yearly_cost                          AS maintenance_yearly_cost,
+            mc_agg.latest_recorded_date                     AS maintenance_recorded_date,
+            -- Pre-compute monthly maintenance cost
+            CASE
+                WHEN mc_agg.avg_yearly_cost IS NOT NULL
+                     THEN mc_agg.avg_yearly_cost / 12.0
+                ELSE NULL
+            END                                             AS maintenance_monthly_cost
         FROM vehicles v
         JOIN brands b ON b.brand_id = v.brand_id
         LEFT JOIN vehicle_classes c ON c.class_id = v.class_id
@@ -459,15 +475,12 @@ def _build_candidate_query(
         LEFT JOIN fuel_types f ON f.fuel_type_id = v.fuel_type_id
         LEFT JOIN LATERAL (
             SELECT
-                m.record_id,
-                m.yearly_cost,
-                m.recorded_date,
-                m.source
+                COUNT(*)                                    AS maintenance_count,
+                AVG(m.yearly_cost::float)                   AS avg_yearly_cost,
+                MAX(m.recorded_date)                        AS latest_recorded_date
             FROM maintenance_costs m
             WHERE m.vehicle_id = v.vehicle_id
-            ORDER BY m.recorded_date DESC NULLS LAST, m.record_id DESC
-            LIMIT 1
-        ) mc ON TRUE
+        ) mc_agg ON TRUE
         WHERE v.manufacturing_year IS NOT NULL
         """
     ]
@@ -682,6 +695,8 @@ class DBPipelineRecommender:
 
         display_columns = [
             "vehicle_id",
+            "fuel_type_id",
+            "image_url",
             "YEAR",
             "Make",
             "Model",
@@ -692,17 +707,20 @@ class DBPipelineRecommender:
             "CYLINDERS",
             "Transmission",
             "FUEL",
+            "fuel_type_name",
+            "fuel_price",
+            "fuel_efficiency_combined",
             "COMB (L/100 km)",
             "COMB (mpg)",
             "EMISSIONS",
-            "maintenance_record_id",
+            "maintenance_record_count",
             "maintenance_yearly_cost",
+            "maintenance_monthly_cost",
             "maintenance_recorded_date",
-            "maintenance_source",
             "Compatibility_Score",
             "Need_Match",
             "Usage_Match",
-            "maintainability_score",   # ← new LK target (present after retraining)
+            "maintainability_score",
         ]
         available_display_columns = [c for c in display_columns if c in scored_df.columns]
 

@@ -449,3 +449,98 @@ def logout_user_appwrite(session_id: str) -> Dict:
             "message": f"Logout failed: {str(e)}",
             "error": "SERVER_ERROR"
         }
+
+
+def change_password_appwrite(appwrite_id: str, email: str, current_password: str, new_password: str) -> Dict:
+    """
+    Change user password by verifying current password via Appwrite session, then
+    updating via the server-side Users admin service.
+    
+    Returns:
+        Dict with success flag and message
+    """
+    try:
+        # 1. Verify current password by attempting a real Appwrite email/password session
+        client = get_appwrite_client()
+        from appwrite.services.account import Account
+        account = Account(client)
+        try:
+            session = account.create_email_password_session(
+                email=_normalize_email(email),
+                password=current_password
+            )
+            verify_session_id = _extract_id(session)
+            # Clean up this verification session immediately
+            try:
+                account.delete_session(verify_session_id)
+            except Exception:
+                pass
+        except AppwriteException as ve:
+            return {
+                "success": False,
+                "message": "Current password is incorrect.",
+                "error": "WRONG_PASSWORD"
+            }
+
+        # 2. Update password via admin Users service (no current-password requirement)
+        users_service = get_users_service()
+        users_service.update_password(appwrite_id, new_password)
+
+        # 3. Record the password-change timestamp in MongoDB
+        try:
+            db = get_database()
+            users_collection = db["users"]
+            users_collection.update_one(
+                {"appwrite_id": appwrite_id},
+                {"$set": {"last_password_change": datetime.now(timezone.utc)}}
+            )
+        except Exception:
+            pass  # Non-fatal
+
+        return {"success": True, "message": "Password changed successfully."}
+
+    except AppwriteException as e:
+        return {"success": False, "message": str(e), "error": "APPWRITE_ERROR"}
+    except Exception as e:
+        return {"success": False, "message": f"Password change failed: {str(e)}", "error": "SERVER_ERROR"}
+
+
+def delete_account_appwrite(appwrite_id: str, user_id: str) -> Dict:
+    """
+    Permanently delete a user from Appwrite and MongoDB.
+    
+    Args:
+        appwrite_id: Appwrite user ID
+        user_id:     MongoDB ObjectId string
+    
+    Returns:
+        Dict with success flag and message
+    """
+    try:
+        from bson import ObjectId
+
+        # 1. Delete from Appwrite (admin API)
+        users_service = get_users_service()
+        try:
+            users_service.delete(appwrite_id)
+        except AppwriteException as e:
+            if "not found" not in str(e).lower():
+                raise
+
+        # 2. Delete from MongoDB
+        db = get_database()
+        users_collection = db["users"]
+        if user_id:
+            try:
+                users_collection.delete_one({"_id": ObjectId(user_id)})
+            except Exception:
+                users_collection.delete_one({"appwrite_id": appwrite_id})
+        else:
+            users_collection.delete_one({"appwrite_id": appwrite_id})
+
+        return {"success": True, "message": "Account deleted successfully."}
+
+    except AppwriteException as e:
+        return {"success": False, "message": str(e), "error": "APPWRITE_ERROR"}
+    except Exception as e:
+        return {"success": False, "message": f"Delete failed: {str(e)}", "error": "SERVER_ERROR"}

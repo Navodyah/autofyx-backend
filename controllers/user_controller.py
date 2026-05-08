@@ -6,7 +6,9 @@ from services.appwrite_service import (
     login_user_appwrite,
     get_user_profile,
     update_user_profile,
-    logout_user_appwrite
+    logout_user_appwrite,
+    change_password_appwrite,
+    delete_account_appwrite,
 )
 
 
@@ -75,3 +77,16 @@ def logout_user(session_id: str):
     """
     return logout_user_appwrite(session_id)
 
+
+def change_user_password(appwrite_id: str, email: str, current_password: str, new_password: str):
+    """
+    Change user password after verifying current password.
+    """
+    return change_password_appwrite(appwrite_id, email, current_password, new_password)
+
+
+def delete_user_account(appwrite_id: str, user_id: str):
+    """
+    Permanently delete user from Appwrite and MongoDB.
+    """
+    return delete_account_appwrite(appwrite_id, user_id)

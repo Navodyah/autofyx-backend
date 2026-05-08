@@ -4,7 +4,9 @@ from controllers.user_controller import (
     login_user_mongo,
     get_user_by_id,
     update_user_by_id,
-    logout_user
+    logout_user,
+    change_user_password,
+    delete_user_account,
 )
 from models.user_models import User, UserLogin
 from fastapi.exceptions import RequestValidationError
@@ -178,3 +180,56 @@ async def logout(session_data: dict = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(body: dict = Body(...)):
+    """
+    Change user password after verifying the current one.
+    Requires: appwrite_id, email, current_password, new_password
+    """
+    try:
+        appwrite_id    = body.get("appwrite_id", "")
+        email          = body.get("email", "")
+        current_pw     = body.get("current_password", "")
+        new_pw         = body.get("new_password", "")
+
+        if not all([appwrite_id, email, current_pw, new_pw]):
+            raise HTTPException(status_code=400, detail="appwrite_id, email, current_password and new_password are required.")
+        if len(new_pw) < 8:
+            raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
+
+        result = change_user_password(appwrite_id, email, current_pw, new_pw)
+        if not result.get("success"):
+            error = result.get("error", "")
+            status_code = 401 if error == "WRONG_PASSWORD" else 400
+            raise HTTPException(status_code=status_code, detail=result.get("message", "Password change failed."))
+
+        return {"message": result["message"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/delete", status_code=status.HTTP_200_OK)
+async def delete_account(body: dict = Body(...)):
+    """
+    Permanently delete a user account from Appwrite and MongoDB.
+    Requires: appwrite_id, user_id (MongoDB ObjectId string)
+    """
+    try:
+        appwrite_id = body.get("appwrite_id", "")
+        user_id     = body.get("user_id", "")
+
+        if not appwrite_id:
+            raise HTTPException(status_code=400, detail="appwrite_id is required.")
+
+        result = delete_user_account(appwrite_id, user_id)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("message", "Delete failed."))
+
+        return {"message": result["message"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

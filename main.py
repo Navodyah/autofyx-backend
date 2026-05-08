@@ -30,6 +30,7 @@ from routes.lookup_routes import router as lookup_router
 from routes.user_profile_routes import router as user_profile_router
 from routes.admin_vehicle_image_routes import router as admin_vehicle_image_router
 from routes.researcher_analytics_routes import router as researcher_analytics_router
+from routes.application_routes import router as application_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,6 +79,7 @@ app.include_router(lookup_router)
 app.include_router(user_profile_router)
 app.include_router(admin_vehicle_image_router)
 app.include_router(researcher_analytics_router)
+app.include_router(application_router)
 
 app.include_router(maintenance_router, prefix="/maintenance_costs", include_in_schema=False)
 

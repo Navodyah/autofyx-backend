@@ -10,8 +10,66 @@ from controllers.user_controller import (
 )
 from models.user_models import User, UserLogin
 from fastapi.exceptions import RequestValidationError
+from config.mongodb import get_database
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/all", status_code=status.HTTP_200_OK)
+async def get_all_users():
+    """Admin: fetch all users from MongoDB."""
+    try:
+        db = get_database()
+        users_cursor = db["users"].find({}, {
+            "_id": 1, "username": 1, "email": 1,
+            "user_type": 1, "created_at": 1,
+            "appwrite_id": 1, "is_banned": 1,
+            "profile_image_url": 1,
+        })
+        users = []
+        for u in users_cursor:
+            u["_id"] = str(u["_id"])
+            if u.get("created_at"):
+                u["created_at"] = str(u["created_at"])
+            users.append(u)
+        return {"users": users, "total": len(users)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/ban/{user_id}", status_code=status.HTTP_200_OK)
+async def toggle_ban_user(user_id: str, body: dict = Body(...)):
+    """Admin: ban or unban a user."""
+    try:
+        from bson import ObjectId
+        db = get_database()
+        banned = body.get("is_banned", True)
+        db["users"].update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"is_banned": banned}}
+        )
+        return {"message": f"User {'banned' if banned else 'unbanned'} successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/activity/{user_id}", status_code=status.HTTP_200_OK)
+async def get_user_activity(user_id: str):
+    """Admin: get a user's recent activity."""
+    try:
+        db = get_database()
+        searches = list(db["search_history"].find({"user_id": user_id}).sort("timestamp", -1).limit(10))
+        comparisons = list(db["comparisons"].find({"user_id": user_id}).sort("created_at", -1).limit(10))
+        for doc in searches + comparisons:
+            doc["_id"] = str(doc["_id"])
+            for key in ["timestamp", "created_at"]:
+                if doc.get(key):
+                    doc[key] = str(doc[key])
+        return {"searches": searches, "comparisons": comparisons}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(user: User = Body(...)):

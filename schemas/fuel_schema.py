@@ -21,6 +21,7 @@ class FuelTypeUpdate(FuelTypeBase):
 class FuelTypeResponse(FuelTypeBase):
     fuel_type_id: int
     fuel_efficiency_combined: Optional[Decimal] = None
+    last_updated: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -6,12 +6,30 @@ from controllers.fuel_controller import (
     get_fuel_type_by_id,
     get_all_fuel_types,
     update_fuel_type,
-    delete_fuel_type
+    delete_fuel_type,
+    scrape_fuel_prices,
+    bulk_update_fuel_prices
 )
 from schemas.fuel_schema import FuelTypeCreate, FuelTypeUpdate, FuelTypeResponse
-from typing import List
+from typing import List, Dict, Any
 
 router = APIRouter(prefix="/fuel_types", tags=["fuel-types"])
+
+
+@router.get("/scrape")
+async def scrape_fuel_prices_route():
+    """Scrape Ceypetco for fuel prices without saving to DB"""
+    result = await scrape_fuel_prices()
+    if result["status"] == "error":
+        raise HTTPException(status_code=500, detail=result["message"])
+    return result
+
+
+@router.post("/bulk-update")
+async def bulk_update_route(updates: Dict[str, float], db: AsyncSession = Depends(get_db)):
+    """Bulk update fuel prices given a dict of {fuel_type_id: new_price}"""
+    result = await bulk_update_fuel_prices(db, updates)
+    return result
 
 
 @router.post("/", response_model=FuelTypeResponse, status_code=201)

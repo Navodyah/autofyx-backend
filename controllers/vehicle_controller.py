@@ -73,7 +73,6 @@ async def create_vehicle(
     engine_size: Optional[Decimal] = None,
     minimum_price: Optional[Decimal] = None,
     max_price: Optional[Decimal] = None,
-    image_url: Optional[str] = None,
     fuel_efficiency_highway: Optional[Decimal] = None,
     fuel_efficiency_combined: Optional[Decimal] = None,
     description: Optional[str] = None
@@ -119,7 +118,6 @@ async def create_vehicle(
         max_price=max_price,
         manufacturing_year=manufacturing_year,
         tyre_size=tyre_size,
-        image_url=image_url,
         fuel_efficiency_highway=fuel_efficiency_highway,
         fuel_efficiency_combined=fuel_efficiency_combined,
         description=description
@@ -159,7 +157,6 @@ async def update_vehicle(
     engine_size: Optional[Decimal] = None,
     minimum_price: Optional[Decimal] = None,
     max_price: Optional[Decimal] = None,
-    image_url: Optional[str] = None,
     fuel_efficiency_highway: Optional[Decimal] = None,
     fuel_efficiency_combined: Optional[Decimal] = None,
     description: Optional[str] = None
@@ -202,8 +199,6 @@ async def update_vehicle(
         vehicle.manufacturing_year = manufacturing_year
     if tyre_size is not None:
         vehicle.tyre_size = tyre_size
-    if image_url is not None:
-        vehicle.image_url = image_url
     if fuel_efficiency_highway is not None:
         vehicle.fuel_efficiency_highway = fuel_efficiency_highway
     if fuel_efficiency_combined is not None:

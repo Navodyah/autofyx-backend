@@ -304,6 +304,15 @@ def login_user_appwrite(credentials: UserLogin) -> Dict:
             }
         )
 
+        try:
+            db["login_history"].insert_one({
+                "user_id": str(user_doc["_id"]),
+                "timestamp": now,
+                "event": "login"
+            })
+        except Exception:
+            pass
+
         return {
             "success": True,
             "message": "Login successful",

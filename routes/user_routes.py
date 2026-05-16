@@ -60,12 +60,13 @@ async def get_user_activity(user_id: str):
         db = get_database()
         searches = list(db["search_history"].find({"user_id": user_id}).sort("timestamp", -1).limit(10))
         comparisons = list(db["comparisons"].find({"user_id": user_id}).sort("created_at", -1).limit(10))
-        for doc in searches + comparisons:
+        logins = list(db["login_history"].find({"user_id": user_id}).sort("timestamp", -1).limit(10))
+        for doc in searches + comparisons + logins:
             doc["_id"] = str(doc["_id"])
             for key in ["timestamp", "created_at"]:
                 if doc.get(key):
                     doc[key] = str(doc[key])
-        return {"searches": searches, "comparisons": comparisons}
+        return {"searches": searches, "comparisons": comparisons, "logins": logins}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

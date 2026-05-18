@@ -65,8 +65,36 @@ class VehicleUpdate(BaseModel):
     model_config = ConfigDict(validate_by_name=True)
 
 
+# ── Nested summary schemas (used inside VehicleResponse) ──────────────────────
+
+class BrandSummary(BaseModel):
+    brand_id: int
+    brand_name: str
+    country: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FuelTypeSummary(BaseModel):
+    fuel_type_id: int
+    fuel_type_name: str
+    fuel_price: Optional[Decimal] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VehicleClassSummary(BaseModel):
+    class_id: int
+    class_name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
 class VehicleResponse(VehicleBase):
     vehicle_id: int
     created_at: datetime
 
+    # Nested relational objects populated via selectinload in the controller
+    brand: Optional[BrandSummary] = None
+    fuel_type: Optional[FuelTypeSummary] = None
+    vehicle_class: Optional[VehicleClassSummary] = None
+
     model_config = ConfigDict(from_attributes=True, validate_by_name=True)
+
